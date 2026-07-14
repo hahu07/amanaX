@@ -1,0 +1,53 @@
+module AmanaX.Product.ProductStructure where
+
+import AmanaX.Product.Types
+
+-- | Created by the Issuing House exercising ProductProposal_Structure
+-- (propose-accept: docs/implementation_plan.md §3.5 — "Fund Manager org,
+-- Issuing House org (propose-accept)"). Both are signatories from creation;
+-- the Issuing House alone controls further terms edits and finalization.
+--
+-- No Shariah Advisor / Trustee observers yet — Daml requires archive+
+-- recreate to broaden a contract's observers, and Milestone 3 (Shariah &
+-- Trustee review) is precisely the step that submits a Finalized structure
+-- for review, so that's the natural point to add them, not here.
+template ProductStructure
+  with
+    fundManager : Party
+    issuingHouse : Party
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    status : ProductStructureStatus
+  where
+    signatory fundManager, issuingHouse
+
+    ensure productName /= "" && targetSizeNGN > 0.0 && tenorMonths > 0 && minSubscriptionNGN >= 0.0
+
+    choice ProductStructure_UpdateTerms : ContractId ProductStructure
+      with
+        newStructureType : ProductType
+        newProfitMechanism : Text
+        newMinSubscriptionNGN : Decimal
+        newRedemptionTerms : Text
+        newTenorMonths : Int
+      controller issuingHouse
+      do
+        assertMsg "Can only update terms while the structure is in Draft" (status == ProductStructure_Draft)
+        create this with
+          structureType = newStructureType
+          profitMechanism = newProfitMechanism
+          minSubscriptionNGN = newMinSubscriptionNGN
+          redemptionTerms = newRedemptionTerms
+          tenorMonths = newTenorMonths
+
+    choice ProductStructure_Finalize : ContractId ProductStructure
+      controller issuingHouse
+      do
+        assertMsg "Can only finalize a Draft structure" (status == ProductStructure_Draft)
+        create this with status = ProductStructure_Finalized

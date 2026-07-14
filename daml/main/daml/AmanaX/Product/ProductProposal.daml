@@ -1,0 +1,61 @@
+module AmanaX.Product.ProductProposal where
+
+import AmanaX.Product.Types
+import AmanaX.Product.ProductStructure
+
+-- | Step 1 of the MVP workflow (docs/prompt.md): a Fund Manager proposes a
+-- new Islamic Investment Product to a specific Issuing House. Signatory is
+-- the Fund Manager alone; the Issuing House is only an observer until it
+-- exercises ProductProposal_Structure, at which point both become
+-- signatories on the resulting ProductStructure (propose-accept, §3.5).
+--
+-- Standard propose-accept choice triple (Accept/Reject/Cancel, per §2 of
+-- docs/implementation_plan.md) maps here to Structure/Reject/Withdraw.
+template ProductProposal
+  with
+    fundManager : Party
+    issuingHouse : Party
+    productName : Text
+    description : Text
+    proposedType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+  where
+    signatory fundManager
+    observer issuingHouse
+
+    ensure productName /= "" && targetSizeNGN > 0.0 && tenorMonths > 0
+
+    choice ProductProposal_Withdraw : ()
+      controller fundManager
+      do pure ()
+
+    choice ProductProposal_Reject : ()
+      controller issuingHouse
+      do pure ()
+
+    -- Step 2: the Issuing House's initial structuring pass. Later refined
+    -- via ProductStructure_UpdateTerms (e.g. after the AI Product
+    -- Structuring Agent's recommendation, Step 3) and locked in via
+    -- ProductStructure_Finalize (Step 4).
+    choice ProductProposal_Structure : ContractId ProductStructure
+      with
+        structureType : ProductType
+        profitMechanism : Text
+        minSubscriptionNGN : Decimal
+        redemptionTerms : Text
+        structureTenorMonths : Int
+      controller issuingHouse
+      do
+        create ProductStructure with
+          fundManager
+          issuingHouse
+          productName
+          description
+          structureType
+          targetSizeNGN
+          tenorMonths = structureTenorMonths
+          profitMechanism
+          minSubscriptionNGN
+          redemptionTerms
+          status = ProductStructure_Draft

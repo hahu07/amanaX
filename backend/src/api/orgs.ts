@@ -31,7 +31,11 @@ orgsRouter.post("/orgs", requireRole("PlatformOperator"), async (req, res) => {
   res.status(201).json(org);
 });
 
-orgsRouter.get("/orgs", requireRole("PlatformOperator"), async (_req, res) => {
+// Read-only, any authenticated role: cross-org workflows (a Fund Manager
+// picking an Issuing House to propose to, an Issuing House picking a
+// Shariah Advisor to route a review to, etc.) need a directory of
+// counterparties. Only create/deactivate stay Platform-Operator-only.
+orgsRouter.get("/orgs", async (_req, res) => {
   const operator = await getOperatorParty();
   const orgs = await listOrganizations(operator);
   res.status(200).json(orgs);

@@ -114,6 +114,39 @@ export async function submitExercise(params: {
   return { contractId: created.CreatedEvent.contractId, createArgument: created.CreatedEvent.createArgument };
 }
 
+// For choices that return `()` (Withdraw/Reject-style — archive with no
+// resulting contract): submitExercise's CreatedEvent lookup would throw on
+// these, since there's nothing created. Plain submit-and-wait is enough —
+// no transaction tree needed when there's no result to extract from it.
+export async function submitExerciseVoid(params: {
+  templateId: string;
+  contractId: string;
+  choice: string;
+  choiceArgument?: Record<string, unknown>;
+  actAs: string[];
+}): Promise<void> {
+  const { error } = await ledgerClient.POST("/v2/commands/submit-and-wait", {
+    body: {
+      commandId: randomUUID(),
+      actAs: params.actAs,
+      userId: config.ledgerUserId,
+      commands: [
+        {
+          ExerciseCommand: {
+            templateId: params.templateId,
+            contractId: params.contractId,
+            choice: params.choice,
+            choiceArgument: params.choiceArgument ?? {},
+          },
+        },
+      ],
+    },
+  });
+  if (error) {
+    throw new Error(`submitExerciseVoid(${params.templateId}#${params.choice}) failed: ${JSON.stringify(error)}`);
+  }
+}
+
 export async function queryActiveContracts(params: {
   party: string;
   templateFilterId?: string;

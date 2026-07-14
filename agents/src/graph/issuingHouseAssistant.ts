@@ -22,7 +22,7 @@ type AssistantStateType = typeof AssistantState.State;
 
 async function productStructuringNode(state: AssistantStateType): Promise<Partial<AssistantStateType>> {
   const output = await runProductStructuringAgent(state.context);
-  return { result: { agent: "product-structuring", output, model: "stub-milestone-0", timestamp: new Date().toISOString() } };
+  return { result: { agent: "product-structuring", output, model: "rule-based-v1", timestamp: new Date().toISOString() } };
 }
 
 async function complianceNode(state: AssistantStateType): Promise<Partial<AssistantStateType>> {

@@ -1,0 +1,124 @@
+module AmanaX.Product.ProductWorkflowTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Product.Types
+import AmanaX.Product.ProductProposal
+import AmanaX.Product.ProductStructure
+
+-- | Milestone 2 gate: a proposal can be created and structured. Covers the
+-- full Step 1-4 lifecycle from docs/prompt.md: propose -> structure ->
+-- (AI recommendation happens off-ledger) -> update terms -> finalize.
+proposeStructureFinalizeTest : Script ()
+proposeStructureFinalizeTest = do
+  fundManager <- allocateParty "FundManagerCo"
+  issuingHouse <- allocateParty "IssuingHouseCo"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      fundManager
+      issuingHouse
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      proposedType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Ijarah
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      structureTenorMonths = 24
+
+  structure <- queryContractId issuingHouse structureCid
+  case structure of
+    None -> error "expected structure to exist"
+    Some s -> do
+      s.status === ProductStructure_Draft
+      s.fundManager === fundManager
+      s.issuingHouse === issuingHouse
+
+  -- proposal is consumed — the Fund Manager can no longer see it as active
+  proposalStillActive <- queryContractId fundManager proposalCid
+  proposalStillActive === None
+
+  updatedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_UpdateTerms with
+      newStructureType = Ijarah
+      newProfitMechanism = "Lease rental distributed monthly"
+      newMinSubscriptionNGN = 2000000.0
+      newRedemptionTerms = "Bullet redemption at maturity"
+      newTenorMonths = 24
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd updatedCid ProductStructure_Finalize
+
+  finalized <- queryContractId issuingHouse finalizedCid
+  case finalized of
+    None -> error "expected finalized structure to exist"
+    Some s -> do
+      s.status === ProductStructure_Finalized
+      s.minSubscriptionNGN === 2000000.0
+
+  -- a finalized structure can no longer have its terms updated
+  submitMustFail issuingHouse do
+    exerciseCmd finalizedCid ProductStructure_UpdateTerms with
+      newStructureType = Ijarah
+      newProfitMechanism = "should fail"
+      newMinSubscriptionNGN = 1.0
+      newRedemptionTerms = "should fail"
+      newTenorMonths = 1
+
+-- | Fund Manager can withdraw a proposal before the Issuing House acts on
+-- it; Issuing House can reject one instead of structuring it.
+withdrawAndRejectTest : Script ()
+withdrawAndRejectTest = do
+  fundManager <- allocateParty "FundManagerCo2"
+  issuingHouse <- allocateParty "IssuingHouseCo2"
+
+  withdrawnCid <- submit fundManager do
+    createCmd ProductProposal with
+      fundManager
+      issuingHouse
+      productName = "Withdrawn Note"
+      description = "Will be withdrawn."
+      proposedType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+
+  submit fundManager do
+    exerciseCmd withdrawnCid ProductProposal_Withdraw
+
+  rejectedCid <- submit fundManager do
+    createCmd ProductProposal with
+      fundManager
+      issuingHouse
+      productName = "Rejected Note"
+      description = "Will be rejected."
+      proposedType = Mudarabah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+
+  submit issuingHouse do
+    exerciseCmd rejectedCid ProductProposal_Reject
+
+  -- Fund Manager cannot structure their own proposal (not the controller)
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      fundManager
+      issuingHouse
+      productName = "Guarded Note"
+      description = "Fund Manager should not be able to structure this."
+      proposedType = Wakalah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+
+  submitMustFail fundManager do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Wakalah
+      profitMechanism = "n/a"
+      minSubscriptionNGN = 0.0
+      redemptionTerms = "n/a"
+      structureTenorMonths = 6

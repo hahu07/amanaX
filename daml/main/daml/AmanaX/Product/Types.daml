@@ -1,0 +1,17 @@
+module AmanaX.Product.Types where
+
+-- | Islamic finance structures the MVP demonstrates (docs/overview_amanax.md
+-- lists a broader set — Sukuk, Musharakah, trade finance funds, etc. — the
+-- MVP's own workflow (docs/prompt.md) narrows to the Investment Note; these
+-- four cover the underlying contract structures a note can be built on).
+data ProductType
+  = Murabahah
+  | Ijarah
+  | Wakalah
+  | Mudarabah
+  deriving (Eq, Show)
+
+data ProductStructureStatus
+  = ProductStructure_Draft
+  | ProductStructure_Finalized
+  deriving (Eq, Show)

@@ -38,3 +38,14 @@ export function requireRole(...roles: Role[]) {
     next();
   };
 }
+
+// Every non-PlatformOperator role is scoped to exactly one Organization
+// party (§3.3) — routes gated by requireRole(...orgRoles) can rely on this
+// being set. Throws rather than returning undefined so a route can't
+// silently submit a ledger command as an empty actAs.
+export function requireOrgParty(req: Request): string {
+  if (!req.auth?.org) {
+    throw new Error("requireOrgParty called on a request with no org claim");
+  }
+  return req.auth.org;
+}

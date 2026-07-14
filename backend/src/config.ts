@@ -13,4 +13,8 @@ export const config = {
   // Bootstraps the one human operator allowed to log in before any User
   // contract exists — see backend/src/auth/devLogin.ts.
   operatorEmail: process.env.OPERATOR_EMAIL ?? "operator@amanax.dev",
+  // The agents/ service (LangGraph.js) — see docs/implementation_plan.md
+  // §6.4. Only the backend ever calls this; it never holds ledger
+  // credentials and is never called directly by the frontend.
+  agentsServiceUrl: process.env.AGENTS_SERVICE_URL ?? "http://localhost:4100",
 };
