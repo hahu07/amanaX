@@ -1,0 +1,50 @@
+module AmanaX.Identity.Organization where
+
+-- | The set of organization-type participants AmanaX onboards. Platform
+-- Operator is the administrator (never itself an Organization record) and
+-- Investor is a platform-managed individual party, not a firm — see
+-- InvestorProfile in Milestone 6. docs/implementation_plan.md §3.3.
+data OrgRole
+  = FundManager
+  | IssuingHouse
+  | Trustee
+  | ShariahAdvisor
+  | Custodian
+  | Distributor
+  | SEC
+  deriving (Eq, Show)
+
+-- | One Daml party per organization (docs/implementation_plan.md §3.3,
+-- decision confirmed 2026-07-14). Operator-administered: the Platform
+-- Operator is the sole signatory, admitting a member org onto the network —
+-- the org's own party is only an observer of its own registry record, the
+-- same way a regulated network's governance would admit a member. The org
+-- party gets real signing authority starting Milestone 2 (e.g. as
+-- signatory/controller on ProductProposal), just not over this record.
+template Organization
+  with
+    operator : Party
+    party : Party
+    name : Text
+    role : OrgRole
+    active : Bool
+  where
+    signatory operator
+    observer party
+
+    ensure name /= ""
+
+    -- No contract key: LF 2.1 (pinned for the vendored Token Standard
+    -- packages, see docs/milestones/milestone-0.md) doesn't support them
+    -- (from 2.3 only). Lookup is by active-contract-set query instead —
+    -- see backend/src/ledger/organizations.ts.
+
+    choice Organization_Deactivate : ContractId Organization
+      controller operator
+      do
+        create this with active = False
+
+    choice Organization_Reactivate : ContractId Organization
+      controller operator
+      do
+        create this with active = True

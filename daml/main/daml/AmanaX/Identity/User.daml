@@ -1,0 +1,38 @@
+module AmanaX.Identity.User where
+
+import AmanaX.Identity.Organization (OrgRole)
+
+-- | An on-ledger audit record binding a named individual to an
+-- Organization's party and role. Individual humans are not separate Daml
+-- parties (docs/implementation_plan.md §3.3) — they act through the
+-- backend's RBAC layer, which maps a JWT-authenticated user to
+-- (org party, role) and submits ledger commands with the org as actAs.
+-- This record exists so the ledger itself can prove, for audit, which
+-- named person an org-signed action was attributed to. Same authorization
+-- shape as Organization: operator-administered.
+template User
+  with
+    operator : Party
+    org : Party
+    userId : Text
+    email : Text
+    displayName : Text
+    role : OrgRole
+    active : Bool
+  where
+    signatory operator
+    observer org
+
+    ensure userId /= "" && email /= "" && displayName /= ""
+
+    -- No contract key — see the same note in Organization.daml.
+
+    choice User_Deactivate : ContractId User
+      controller operator
+      do
+        create this with active = False
+
+    choice User_Reactivate : ContractId User
+      controller operator
+      do
+        create this with active = True

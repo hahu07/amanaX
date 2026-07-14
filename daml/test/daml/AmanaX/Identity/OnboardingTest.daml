@@ -1,0 +1,86 @@
+module AmanaX.Identity.OnboardingTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Identity.Organization
+import AmanaX.Identity.User qualified as IdentityUser
+
+-- | Milestone 1 gate: Platform Operator can onboard an organization and a
+-- user for every org role in the platform.
+onboardsEveryOrgRoleTest : Script ()
+onboardsEveryOrgRoleTest = do
+  operator <- allocateParty "PlatformOperator"
+  let roles =
+        [ FundManager, IssuingHouse, Trustee, ShariahAdvisor
+        , Custodian, Distributor, SEC
+        ]
+
+  orgsAndUsers <- forA roles $ \role -> do
+    orgParty <- allocateParty (show role)
+    orgCid <- submit operator do
+      createCmd Organization with
+        operator
+        party = orgParty
+        name = show role <> " Ltd"
+        role
+        active = True
+
+    userCid <- submit operator do
+      createCmd IdentityUser.User with
+        operator
+        org = orgParty
+        userId = show role <> "-user-1"
+        email = show role <> "@example.com"
+        displayName = show role <> " Contact"
+        role
+        active = True
+
+    pure (orgCid, userCid)
+
+  length orgsAndUsers === 7
+
+-- | Operator can deactivate and reactivate an org and a user without losing
+-- the audit trail (soft-toggle via a fresh contract, not a hard delete).
+deactivateReactivateTest : Script ()
+deactivateReactivateTest = do
+  operator <- allocateParty "PlatformOperator"
+  orgParty <- allocateParty "FundManagerCo"
+
+  orgCid <- submit operator do
+    createCmd Organization with
+      operator
+      party = orgParty
+      name = "FundManager Co"
+      role = FundManager
+      active = True
+
+  userCid <- submit operator do
+    createCmd IdentityUser.User with
+      operator
+      org = orgParty
+      userId = "fm-user-1"
+      email = "fm1@example.com"
+      displayName = "FM Contact"
+      role = FundManager
+      active = True
+
+  deactivatedOrgCid <- submit operator do
+    exerciseCmd orgCid Organization_Deactivate
+  deactivatedOrg <- queryContractId operator deactivatedOrgCid
+  case deactivatedOrg of
+    None -> error "expected deactivated org to exist"
+    Some org -> org.active === False
+
+  reactivatedOrgCid <- submit operator do
+    exerciseCmd deactivatedOrgCid Organization_Reactivate
+  reactivatedOrg <- queryContractId operator reactivatedOrgCid
+  case reactivatedOrg of
+    None -> error "expected reactivated org to exist"
+    Some org -> org.active === True
+
+  deactivatedUserCid <- submit operator do
+    exerciseCmd userCid IdentityUser.User_Deactivate
+  deactivatedUser <- queryContractId operator deactivatedUserCid
+  case deactivatedUser of
+    None -> error "expected deactivated user to exist"
+    Some user -> user.active === False
