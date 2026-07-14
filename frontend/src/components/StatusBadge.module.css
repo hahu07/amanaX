@@ -1,0 +1,63 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.success {
+  background: var(--status-success-bg);
+  border-color: var(--status-success-border);
+  color: var(--status-success);
+}
+.success .dot {
+  background: var(--status-success);
+}
+
+.neutral {
+  background: var(--status-neutral-bg);
+  border-color: var(--status-neutral-border);
+  color: var(--status-neutral);
+}
+.neutral .dot {
+  background: var(--status-neutral);
+}
+
+.error {
+  background: var(--status-error-bg);
+  border-color: var(--status-error-border);
+  color: var(--status-error);
+}
+.error .dot {
+  background: var(--status-error);
+}
+
+.warning {
+  background: var(--status-warning-bg);
+  border-color: var(--status-warning-border);
+  color: var(--status-warning);
+}
+.warning .dot {
+  background: var(--status-warning);
+}
+
+/* Outlined variant — used for role labels, no colored dot */
+.outline {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+  color: var(--text-secondary);
+}

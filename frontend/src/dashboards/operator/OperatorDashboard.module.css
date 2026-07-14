@@ -1,0 +1,117 @@
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+@media (max-width: 720px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+.statLabel {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.statValue {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.statHint {
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+}
+
+/* Onboarding form panel, revealed inline under the card header. Only
+   mounted while open, so collapsed fields are never tab-focusable. */
+.formPanel {
+  border-bottom: 1px solid var(--color-border);
+  animation: reveal 160ms var(--ease-out);
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  background: var(--color-surface-sunken);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 200px;
+  flex: 1 1 200px;
+}
+
+.field label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.field input,
+.field select {
+  height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+}
+
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+  border-color: var(--accent);
+}
+
+.formActions {
+  display: flex;
+  gap: var(--space-3);
+  flex: 0 0 auto;
+}
+
+.cardTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.orgCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.orgName {
+  font-weight: 600;
+  color: var(--text-primary);
+}

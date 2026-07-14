@@ -1,0 +1,118 @@
+/*
+ * AmanaX design tokens.
+ *
+ * Single source of truth for color, type, spacing, radius and motion.
+ * Components consume these via CSS custom properties — no component should
+ * hard-code a hex value, font stack or pixel spacing outside this file.
+ */
+
+:root {
+  /* ---------------------------------------------------------------- */
+  /* Neutral scale — light content surface                            */
+  /* ---------------------------------------------------------------- */
+  --color-bg: #f5f6f5;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f0f2f0;
+  --color-surface-hover: #eaece9;
+  --color-border: #dde1de;
+  --color-border-strong: #c5cbc6;
+
+  --text-primary: #14201b;
+  --text-secondary: #55625b;
+  --text-tertiary: #8b968f;
+  --text-on-accent: #ffffff;
+
+  /* ---------------------------------------------------------------- */
+  /* Dark chrome — sidebar / topbar / login backdrop                  */
+  /* ---------------------------------------------------------------- */
+  --chrome-bg: #12191a;
+  --chrome-surface: #182220;
+  --chrome-surface-hover: #1f2b28;
+  --chrome-border: #263330;
+  --chrome-text: #eef1ef;
+  --chrome-text-secondary: #9db0a7;
+  --chrome-text-muted: #5f7169;
+
+  /* ---------------------------------------------------------------- */
+  /* Accent — deep emerald                                            */
+  /* ---------------------------------------------------------------- */
+  --accent: #0e7c5f;
+  --accent-hover: #0b664e;
+  --accent-active: #095440;
+  --accent-bg: rgba(14, 124, 95, 0.08);
+  --accent-bg-strong: rgba(14, 124, 95, 0.16);
+  --accent-border: rgba(14, 124, 95, 0.35);
+  --accent-on-chrome: #35c497;
+  --accent-on-chrome-bg: rgba(53, 196, 151, 0.14);
+
+  /* ---------------------------------------------------------------- */
+  /* Semantic status colors — muted, not neon                         */
+  /* ---------------------------------------------------------------- */
+  --status-success: #0e7c5f;
+  --status-success-bg: rgba(14, 124, 95, 0.1);
+  --status-success-border: rgba(14, 124, 95, 0.28);
+
+  --status-neutral: #667066;
+  --status-neutral-bg: rgba(102, 112, 102, 0.1);
+  --status-neutral-border: rgba(102, 112, 102, 0.24);
+
+  --status-error: #a8352a;
+  --status-error-bg: rgba(168, 53, 42, 0.08);
+  --status-error-border: rgba(168, 53, 42, 0.28);
+
+  --status-warning: #96631a;
+  --status-warning-bg: rgba(150, 99, 26, 0.1);
+  --status-warning-border: rgba(150, 99, 26, 0.26);
+
+  /* ---------------------------------------------------------------- */
+  /* Typography                                                        */
+  /* ---------------------------------------------------------------- */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.5rem;
+  --text-3xl: 3.375rem;
+
+  --line-tight: 1.15;
+  --line-snug: 1.35;
+  --line-normal: 1.55;
+
+  /* ---------------------------------------------------------------- */
+  /* Spacing scale                                                     */
+  /* ---------------------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --space-9: 96px;
+
+  /* ---------------------------------------------------------------- */
+  /* Radius / elevation / motion                                       */
+  /* ---------------------------------------------------------------- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgba(12, 20, 16, 0.06);
+  --shadow-md: 0 6px 20px rgba(12, 20, 16, 0.08);
+  --shadow-panel: 0 12px 40px rgba(12, 20, 16, 0.16);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --transition-fast: 120ms ease;
+  --transition-base: 180ms var(--ease-out);
+
+  --sidebar-width: 232px;
+  --topbar-height: 60px;
+  --content-max-width: 1180px;
+}

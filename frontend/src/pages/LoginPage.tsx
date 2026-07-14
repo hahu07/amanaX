@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api/authApi";
 import { useAuth } from "../auth/AuthContext";
 import { ROLE_ROUTE } from "../auth/types";
 import { ApiError } from "../api/backendClient";
+import { Button } from "../components/Button";
+import { Alert } from "../components/Alert";
+import styles from "./LoginPage.module.css";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -28,26 +31,41 @@ export default function LoginPage() {
   }
 
   return (
-    <main style={{ fontFamily: "sans-serif", padding: "2rem", maxWidth: 420 }}>
-      <h1>AmanaX</h1>
-      <p>Sign in to continue. (Dev login: email only, no password.)</p>
-      <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-        <label>
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="operator@amanax.dev"
-            style={{ display: "block", width: "100%", padding: "0.5rem" }}
-          />
-        </label>
-        <button type="submit" disabled={submitting}>
-          {submitting ? "Signing in…" : "Sign in"}
-        </button>
-        {error && <p style={{ color: "crimson" }}>{error}</p>}
-      </form>
+    <main className={styles.page}>
+      <div className={styles.card}>
+        <div className={styles.brand}>
+          Amana<span>X</span>
+        </div>
+        <p className={styles.subhead}>
+          Sign in to continue.
+          <span className={styles.devNote}>Dev login for this environment: email only, no password required.</span>
+        </p>
+
+        <form className={styles.form} onSubmit={handleSubmit}>
+          <div className={styles.field}>
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="operator@amanax.dev"
+            />
+          </div>
+
+          {error && <Alert tone="error">{error}</Alert>}
+
+          <Button type="submit" variant="primary" className={styles.submit} disabled={submitting}>
+            {submitting ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+
+        <div className={styles.footerLink}>
+          <Link to="/">← Back to AmanaX</Link>
+        </div>
+      </div>
     </main>
   );
 }

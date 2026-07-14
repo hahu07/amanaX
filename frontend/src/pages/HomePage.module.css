@@ -1,0 +1,404 @@
+.page {
+  background: var(--color-bg);
+  color: var(--text-primary);
+}
+
+.container {
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+  padding: 0 var(--space-6);
+}
+
+/* ---------------------------------------------------------------- */
+/* Header                                                             */
+/* ---------------------------------------------------------------- */
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(245, 246, 245, 0.86);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.headerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+}
+
+.brand {
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand span {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- */
+/* Hero                                                                */
+/* ---------------------------------------------------------------- */
+
+.hero {
+  position: relative;
+  padding: 112px 0 88px;
+  overflow: hidden;
+}
+
+.heroGrid {
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(var(--color-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--color-border) 1px, transparent 1px);
+  background-size: 56px 56px;
+  -webkit-mask-image: radial-gradient(ellipse 60% 70% at 50% 0%, black, transparent 75%);
+  mask-image: radial-gradient(ellipse 60% 70% at 50% 0%, black, transparent 75%);
+  opacity: 0.7;
+}
+
+.heroContent {
+  position: relative;
+  max-width: 760px;
+  animation: fadeUp 480ms var(--ease-out);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-5);
+}
+
+.headline {
+  font-size: clamp(2.25rem, 4vw, var(--text-3xl));
+  font-weight: 700;
+  line-height: var(--line-tight);
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+}
+
+.subhead {
+  margin-top: var(--space-5);
+  font-size: var(--text-lg);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+  max-width: 620px;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-top: var(--space-7);
+}
+
+.heroSecondaryLink {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.heroSecondaryLink:hover {
+  color: var(--accent);
+}
+
+/* ---------------------------------------------------------------- */
+/* Shared section scaffolding                                         */
+/* ---------------------------------------------------------------- */
+
+.section {
+  padding: 80px 0;
+}
+
+.sectionHeading {
+  max-width: 640px;
+  margin-bottom: var(--space-7);
+}
+
+.sectionLabel {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: var(--line-tight);
+}
+
+.sectionDescription {
+  margin-top: var(--space-3);
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+
+/* ---------------------------------------------------------------- */
+/* Problem / solution                                                 */
+/* ---------------------------------------------------------------- */
+
+.compareGrid {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--space-6);
+  align-items: center;
+}
+
+@media (max-width: 860px) {
+  .compareGrid {
+    grid-template-columns: 1fr;
+  }
+  .compareArrow {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+}
+
+.compareCard {
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  height: 100%;
+}
+
+.compareProblem {
+  background: var(--color-surface);
+}
+
+.compareSolution {
+  background: var(--color-surface);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 1px var(--accent-border) inset;
+}
+
+.compareLabel {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-3);
+}
+
+.compareProblem .compareLabel {
+  color: var(--text-tertiary);
+}
+
+.compareSolution .compareLabel {
+  color: var(--accent);
+}
+
+.compareCard p {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+
+.compareArrow {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ---------------------------------------------------------------- */
+/* Network diagram (dark section)                                     */
+/* ---------------------------------------------------------------- */
+
+.networkSection {
+  background: var(--chrome-bg);
+  color: var(--chrome-text);
+  padding: 88px 0 72px;
+}
+
+.networkSection .sectionLabel {
+  color: var(--chrome-text-muted);
+}
+
+.networkSection .sectionTitle {
+  color: var(--chrome-text);
+}
+
+.networkSection .sectionDescription {
+  color: var(--chrome-text-secondary);
+}
+
+.diagramWrap {
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+/* ---------------------------------------------------------------- */
+/* Workflow stepper                                                   */
+/* ---------------------------------------------------------------- */
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-6) var(--space-5);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 920px) {
+  .steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .steps {
+    grid-template-columns: 1fr;
+  }
+}
+
+.step {
+  position: relative;
+  padding-top: var(--space-4);
+  border-top: 2px solid var(--color-border);
+}
+
+.stepActive {
+  border-top-color: var(--accent);
+}
+
+.stepNumber {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: var(--space-2);
+}
+
+.stepTitle {
+  font-size: var(--text-base);
+  font-weight: 650;
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.stepDescription {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+
+/* ---------------------------------------------------------------- */
+/* Trust / compliance                                                 */
+/* ---------------------------------------------------------------- */
+
+.trustSection {
+  background: var(--color-surface-sunken);
+}
+
+.trustGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-5);
+}
+
+@media (max-width: 920px) {
+  .trustGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .trustGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.trustCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.trustIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-bg);
+  color: var(--accent);
+  margin-bottom: var(--space-4);
+}
+
+.trustTitle {
+  font-size: var(--text-base);
+  font-weight: 650;
+  margin-bottom: var(--space-2);
+}
+
+.trustDescription {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: var(--line-normal);
+}
+
+/* ---------------------------------------------------------------- */
+/* Footer                                                              */
+/* ---------------------------------------------------------------- */
+
+.footer {
+  background: var(--chrome-bg);
+  color: var(--chrome-text-muted);
+  padding: var(--space-6) 0;
+  border-top: 1px solid var(--chrome-border);
+}
+
+.footerInner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.footerBrand {
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--chrome-text-secondary);
+}
+
+.footerBrand span {
+  color: var(--accent-on-chrome);
+}
+
+.footerTagline {
+  font-size: var(--text-xs);
+}

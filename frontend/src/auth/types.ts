@@ -29,3 +29,16 @@ export const ROLE_ROUTE: Record<Role, string> = {
   Distributor: "distributor",
   SEC: "sec",
 };
+
+// Human-readable label for a backend role — used across the UI (top bar,
+// sidebar, page headers) instead of the raw PascalCase role identifier.
+export const ROLE_LABEL: Record<Role, string> = {
+  PlatformOperator: "Platform Operator",
+  FundManager: "Fund Manager",
+  IssuingHouse: "Issuing House",
+  Trustee: "Trustee",
+  ShariahAdvisor: "Shariah Advisor",
+  Custodian: "Custodian",
+  Distributor: "Distributor",
+  SEC: "SEC",
+};

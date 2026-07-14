@@ -1,0 +1,155 @@
+.sidebar {
+  width: var(--sidebar-width);
+  flex-shrink: 0;
+  background: var(--chrome-bg);
+  border-right: 1px solid var(--chrome-border);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--topbar-height);
+  padding: 0 var(--space-5);
+  border-bottom: 1px solid var(--chrome-border);
+}
+
+.brandMark {
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--chrome-text);
+}
+
+.brandMark span {
+  color: var(--accent-on-chrome);
+}
+
+.nav {
+  flex: 1;
+  padding: var(--space-4) var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
+.navLabel {
+  padding: var(--space-3) var(--space-2) var(--space-1);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chrome-text-muted);
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--chrome-text-secondary);
+  border: none;
+  background: transparent;
+  text-align: left;
+  width: 100%;
+}
+
+.navItem svg {
+  flex-shrink: 0;
+}
+
+.navItemLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.navItemActive {
+  background: var(--accent-on-chrome-bg);
+  color: var(--chrome-text);
+  position: relative;
+}
+
+.navItemActive::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 16px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-on-chrome);
+}
+
+.navItemDisabled {
+  color: var(--chrome-text-muted);
+  cursor: default;
+}
+
+.comingSoon {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--chrome-text-muted);
+}
+
+.footer {
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--chrome-border);
+  font-size: var(--text-xs);
+  color: var(--chrome-text-muted);
+}
+
+/* ---------------------------------------------------------------- */
+/* Below tablet width the sidebar collapses to an icon rail so the    */
+/* shell never forces horizontal scroll — nav items stay reachable    */
+/* via icon + title tooltip rather than disappearing. Declared last   */
+/* so it wins the cascade over the base rules above at equal          */
+/* specificity.                                                       */
+/* ---------------------------------------------------------------- */
+@media (max-width: 860px) {
+  .sidebar {
+    width: 64px;
+  }
+
+  .brand {
+    padding: 0;
+    justify-content: center;
+  }
+
+  .brandMark {
+    font-size: 0;
+  }
+
+  .brandMark::after {
+    content: "AX";
+    font-size: var(--text-base);
+  }
+
+  .navItem {
+    justify-content: center;
+    padding: var(--space-3);
+  }
+
+  .navItemLabel,
+  .comingSoon,
+  .footer {
+    display: none;
+  }
+
+  .navItemActive::before {
+    left: 0;
+  }
+}

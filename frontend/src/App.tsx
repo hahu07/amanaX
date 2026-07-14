@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { ROLE_ROUTE } from "./auth/types";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import OperatorDashboard from "./dashboards/operator/OperatorDashboard";
 import FundManagerDashboard from "./dashboards/fundManager/FundManagerDashboard";
@@ -12,12 +13,14 @@ import CustodianDashboard from "./dashboards/custodian/CustodianDashboard";
 import DistributorDashboard from "./dashboards/distributor/DistributorDashboard";
 import SecDashboard from "./dashboards/sec/SecDashboard";
 import InvestorDashboard from "./dashboards/investor/InvestorDashboard";
-import "./App.css";
 
+// Signed-out visitors hitting "/" see the public marketing page; signed-in
+// visitors are sent straight to their role's dashboard, unchanged from
+// before.
 function RootRedirect() {
   const { auth } = useAuth();
-  if (!auth) return <Navigate to="/login" replace />;
-  return <Navigate to={`/dashboard/${ROLE_ROUTE[auth.role]}`} replace />;
+  if (auth) return <Navigate to={`/dashboard/${ROLE_ROUTE[auth.role]}`} replace />;
+  return <HomePage />;
 }
 
 export default function App() {

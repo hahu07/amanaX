@@ -12,3 +12,6 @@ dist/
 
 # Editor/OS
 .DS_Store
+
+# Claude Code harness runtime state
+.claude/scheduled_tasks.lock
