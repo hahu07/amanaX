@@ -1,0 +1,12 @@
+sdk-version: 3.5.2
+name: amanax-test
+source: daml
+version: 0.0.1
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+build-options:
+  - --target=2.1
+data-dependencies:
+  - ../main/.daml/dist/amanax-main-0.0.1.dar

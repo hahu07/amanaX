@@ -1,0 +1,14 @@
+# Daml/Canton build artifacts (main, test, and vendored token-standard packages)
+.daml/
+log/
+canton_*.port
+*.log
+
+# Node
+node_modules/
+dist/
+.env
+.env.local
+
+# Editor/OS
+.DS_Store

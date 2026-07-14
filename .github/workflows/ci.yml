@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  daml:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Install DPM
+        run: curl -sSL https://get.digitalasset.com/install/install.sh | sh
+      - name: Install SDK 3.5.2
+        run: |
+          export PATH="$HOME/.dpm/bin:$PATH"
+          dpm install 3.5.2
+      - name: Build vendored Token Standard packages
+        run: |
+          export PATH="$HOME/.dpm/bin:$PATH"
+          for pkg in splice-api-token-metadata-v1 splice-api-token-holding-v1 \
+                     splice-api-token-transfer-instruction-v1 splice-api-token-allocation-v1 \
+                     splice-api-token-allocation-instruction-v1 splice-api-token-allocation-request-v1; do
+            (cd "vendor/token-standard/$pkg" && dpm build)
+          done
+          cp vendor/token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-1.0.0.dar \
+             vendor/token-standard/splice-api-token-metadata-v1/.daml/dist/splice-api-token-metadata-v1-current.dar
+          cp vendor/token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-1.0.0.dar \
+             vendor/token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-current.dar
+          cp vendor/token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-1.0.0.dar \
+             vendor/token-standard/splice-api-token-allocation-v1/.daml/dist/splice-api-token-allocation-v1-current.dar
+      - name: Build AmanaX Daml packages
+        run: |
+          export PATH="$HOME/.dpm/bin:$PATH"
+          cd daml && dpm build --all --package-root main
+      - name: Run Daml Script tests
+        run: |
+          export PATH="$HOME/.dpm/bin:$PATH"
+          cd daml/test && dpm test
+
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: backend
+      - run: npm run build
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+        env:
+          NODE_ENV: test
+
+  agents:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: agents
+      - run: npm run build
+        working-directory: agents
+      - run: npm test
+        working-directory: agents
+        env:
+          NODE_ENV: test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+        working-directory: frontend
+      - run: npx tsc -b
+        working-directory: frontend
+      - run: npx vite build
+        working-directory: frontend
