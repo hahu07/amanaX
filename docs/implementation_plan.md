@@ -43,7 +43,7 @@ Verified live against `canton_lookup` / `canton_check` — do not use stale trai
 - Daml **Scenarios are fully superseded by Daml Script**; test via `dpm test`.
 
 **Ledger API for the TypeScript backend**
-- **JSON Ledger API (port 7575)** is the recommended integration point for a TS backend: `POST /v2/commands/submit-and-wait`, `POST /v2/state/active-contracts`, `GET /v2/state/ledger-end`, `POST /v2/parties/allocate`, `GET /v2/openapi.json`. Generate a typed client from the served OpenAPI spec (e.g. `openapi-fetch`).
+- **JSON Ledger API (port 7575)** is the recommended integration point for a TS backend: `POST /v2/commands/submit-and-wait`, `POST /v2/state/active-contracts`, `GET /v2/state/ledger-end`, `POST /v2/parties/allocate`, `GET /docs/openapi` (confirmed live on Canton 3.5.6 — not `/v2/openapi.json`; see docs/milestones/milestone-0.md). Generate a typed client from the served OpenAPI spec (e.g. `openapi-fetch`).
 - gRPC Ledger API (port 6866) is better suited for the transaction/update stream (replaces the deprecated Daml Triggers pattern) — useful if the backend needs to react to ledger events rather than poll.
 - `@daml/ledger` / `@daml/react` are **deprecated**; the flagged replacements are `@c7/ledger` / `@c7/react` (community-maintained). **Recommendation for this project:** don't take a dependency on a community package for a "production-grade" enterprise app without vetting it first — prefer a client generated from the served OpenAPI spec via `dpm codegen-js`/`codegen-alpha-typescript`, and only reach for `@c7/*` if the generated client proves insufficient. Flagged as an open decision in §5.
 
@@ -194,7 +194,7 @@ Each milestone follows prompt.md's own gating rule: **do not start the next mile
 - Install DPM; scaffold `daml/` (with `multi-package.yaml`), `backend/`, `frontend/`, `agents/` (TypeScript, LangGraph) skeletons.
 - Pin the CIP-0056 Token Standard Daml dependency (exact package/module names pulled from `https://docs.canton.network/appdev/deep-dives/token-standard` and `hyperledger-labs/splice` — not guessed; see §2) into `daml.yaml`.
 - Bring up `dpm sandbox` locally and CN Quickstart LocalNet for later multi-party testing.
-- Backend: health endpoint that round-trips the JSON Ledger API (`GET /v2/state/ledger-end`); scaffold the **generated OpenAPI client** (`dpm codegen-js`/`codegen-alpha-typescript` or client generated from `/v2/openapi.json`) as the only ledger-access path — no `@daml/ledger`/`@c7/ledger` dependency.
+- Backend: health endpoint that round-trips the JSON Ledger API (`GET /v2/state/ledger-end`); scaffold the **generated OpenAPI client** (`dpm codegen-js`/`codegen-alpha-typescript` or client generated from `/docs/openapi`) as the only ledger-access path — no `@daml/ledger`/`@c7/ledger` dependency.
 - Frontend: shell app that calls the backend health endpoint.
 - CI skeleton (build+test on push).
 - **Gate:** empty DAML package builds (including the Token Standard dependency), backend boots and reaches the ledger via the generated client, frontend boots and reaches the backend.
@@ -262,7 +262,7 @@ All open questions from the previous revision of this plan are resolved as of 20
 
 | Decision | Resolution | Where it lands in this plan |
 |---|---|---|
-| Ledger client library | Generated OpenAPI client (from `/v2/openapi.json` via `dpm codegen-js`/`codegen-alpha-typescript`), not `@c7/ledger`/`@c7/react` | §2, §3.2 `backend/src/ledger/`, Milestone 0 |
+| Ledger client library | Generated OpenAPI client (from `/docs/openapi` via `openapi-typescript`), not `@c7/ledger`/`@c7/react` | §2, §3.2 `backend/src/ledger/`, Milestone 0 |
 | Agents service language | TypeScript (LangGraph.js) | §3.2 `agents/`, stack-consistent with backend/frontend |
 | Party model | One Daml party per organization (+ SEC, + Platform Operator) | §3.3 |
 | Investor custody | Platform-managed party for MVP; self-custody is an explicit fast-follow, out of scope for Milestones 0-9 | §3.3 |

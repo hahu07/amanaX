@@ -8,7 +8,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "gen:ledger-client": "openapi-typescript http://localhost:7575/v2/openapi.json -o src/ledger/schema.d.ts"
+    "gen:ledger-client": "openapi-typescript http://localhost:7575/docs/openapi -o src/ledger/schema.d.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
