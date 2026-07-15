@@ -8,6 +8,7 @@ export const ORG_ROLES = [
   "Custodian",
   "Distributor",
   "SEC",
+  "Issuer",
 ] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 

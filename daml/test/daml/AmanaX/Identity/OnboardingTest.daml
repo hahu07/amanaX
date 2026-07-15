@@ -12,7 +12,7 @@ onboardsEveryOrgRoleTest = do
   operator <- allocateParty "PlatformOperator"
   let roles =
         [ FundManager, IssuingHouse, Trustee, ShariahAdvisor
-        , Custodian, Distributor, SEC
+        , Custodian, Distributor, SEC, Issuer
         ]
 
   orgsAndUsers <- forA roles $ \role -> do
@@ -37,7 +37,7 @@ onboardsEveryOrgRoleTest = do
 
     pure (orgCid, userCid)
 
-  length orgsAndUsers === 7
+  length orgsAndUsers === 8
 
 -- | Operator can deactivate and reactivate an org and a user without losing
 -- the audit trail (soft-toggle via a fresh contract, not a hard delete).

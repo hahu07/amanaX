@@ -5,6 +5,15 @@ export type ProductType = (typeof PRODUCT_TYPES)[number];
 
 export type ProductStructureStatus = "ProductStructure_Draft" | "ProductStructure_Finalized";
 
+// The two OrgRoles allowed to sponsor a ProductProposal (§3.5 of
+// docs/implementation_plan.md) — FundManager (Collective Investment Scheme
+// pathway) and Issuer (corporate raising financing against its own
+// balance sheet, public-offer/Sukuk-issuance pathway). Recorded on the
+// ledger as `sponsorType` so the audit trail and any future SEC-filing
+// logic can tell which regulatory pathway a given proposal is on.
+export const SPONSOR_TYPES = ["FundManager", "Issuer"] as const;
+export type SponsorType = (typeof SPONSOR_TYPES)[number];
+
 const PROPOSAL_TEMPLATE_ID = templateId("AmanaX.Product.ProductProposal", "ProductProposal");
 const STRUCTURE_TEMPLATE_ID = templateId("AmanaX.Product.ProductStructure", "ProductStructure");
 
@@ -14,7 +23,8 @@ const STRUCTURE_TEMPLATE_ID = templateId("AmanaX.Product.ProductStructure", "Pro
 
 export interface ProductProposal {
   contractId: string;
-  fundManager: string;
+  sponsor: string;
+  sponsorType: SponsorType;
   issuingHouse: string;
   productName: string;
   description: string;
@@ -25,7 +35,8 @@ export interface ProductProposal {
 
 export interface ProductStructure {
   contractId: string;
-  fundManager: string;
+  sponsor: string;
+  sponsorType: SponsorType;
   issuingHouse: string;
   productName: string;
   description: string;
@@ -42,7 +53,8 @@ function toProposal(contractId: string, arg: unknown): ProductProposal {
   const a = arg as Record<string, unknown>;
   return {
     contractId,
-    fundManager: a.fundManager as string,
+    sponsor: a.sponsor as string,
+    sponsorType: a.sponsorType as SponsorType,
     issuingHouse: a.issuingHouse as string,
     productName: a.productName as string,
     description: a.description as string,
@@ -56,7 +68,8 @@ function toStructure(contractId: string, arg: unknown): ProductStructure {
   const a = arg as Record<string, unknown>;
   return {
     contractId,
-    fundManager: a.fundManager as string,
+    sponsor: a.sponsor as string,
+    sponsorType: a.sponsorType as SponsorType,
     issuingHouse: a.issuingHouse as string,
     productName: a.productName as string,
     description: a.description as string,
@@ -71,7 +84,8 @@ function toStructure(contractId: string, arg: unknown): ProductStructure {
 }
 
 export async function createProposal(params: {
-  fundManager: string;
+  sponsor: string;
+  sponsorType: SponsorType;
   issuingHouse: string;
   productName: string;
   description: string;
@@ -81,9 +95,10 @@ export async function createProposal(params: {
 }): Promise<ProductProposal> {
   const { contractId, createArgument } = await submitCreate({
     templateId: PROPOSAL_TEMPLATE_ID,
-    actAs: [params.fundManager],
+    actAs: [params.sponsor],
     createArguments: {
-      fundManager: params.fundManager,
+      sponsor: params.sponsor,
+      sponsorType: params.sponsorType,
       issuingHouse: params.issuingHouse,
       productName: params.productName,
       description: params.description,
@@ -105,12 +120,12 @@ export async function findProposalById(party: string, contractId: string): Promi
   return proposals.find((p) => p.contractId === contractId);
 }
 
-export async function withdrawProposal(params: { fundManager: string; contractId: string }): Promise<void> {
+export async function withdrawProposal(params: { sponsor: string; contractId: string }): Promise<void> {
   await submitExerciseVoid({
     templateId: PROPOSAL_TEMPLATE_ID,
     contractId: params.contractId,
     choice: "ProductProposal_Withdraw",
-    actAs: [params.fundManager],
+    actAs: [params.sponsor],
   });
 }
 

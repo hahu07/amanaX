@@ -7,7 +7,7 @@ export const structuresRouter = Router();
 
 structuresRouter.use(requireAuth);
 
-structuresRouter.get("/structures", requireRole("FundManager", "IssuingHouse"), async (req, res) => {
+structuresRouter.get("/structures", requireRole("FundManager", "Issuer", "IssuingHouse"), async (req, res) => {
   const structures = await listStructures(requireOrgParty(req));
   res.status(200).json(structures);
 });

@@ -5,7 +5,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import OperatorDashboard from "./dashboards/operator/OperatorDashboard";
-import FundManagerDashboard from "./dashboards/fundManager/FundManagerDashboard";
+import ProductSponsorDashboard from "./dashboards/productSponsor/ProductSponsorDashboard";
 import IssuingHouseDashboard from "./dashboards/issuingHouse/IssuingHouseDashboard";
 import TrusteeDashboard from "./dashboards/trustee/TrusteeDashboard";
 import ShariahAdvisorDashboard from "./dashboards/shariahAdvisor/ShariahAdvisorDashboard";
@@ -42,7 +42,15 @@ export default function App() {
             path="/dashboard/fund-manager"
             element={
               <ProtectedRoute allow={["FundManager"]}>
-                <FundManagerDashboard />
+                <ProductSponsorDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/dashboard/issuer"
+            element={
+              <ProtectedRoute allow={["Issuer"]}>
+                <ProductSponsorDashboard />
               </ProtectedRoute>
             }
           />

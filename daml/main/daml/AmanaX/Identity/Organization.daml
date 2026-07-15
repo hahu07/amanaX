@@ -4,6 +4,16 @@ module AmanaX.Identity.Organization where
 -- Operator is the administrator (never itself an Organization record) and
 -- Investor is a platform-managed individual party, not a firm — see
 -- InvestorProfile in Milestone 6. docs/implementation_plan.md §3.3.
+--
+-- FundManager and Issuer are both product "sponsors" (ProductProposal's
+-- `sponsor`/`sponsorType`) but are distinct regulatory actors under
+-- Nigerian SEC rules: FundManager operates under Collective Investment
+-- Scheme regulation (pools investor capital into a fund it continues to
+-- manage); Issuer is a corporate raising financing against its own
+-- balance sheet under public-offer/Sukuk-issuance rules, with no ongoing
+-- fund-management role after issuance. Kept as separate roles rather than
+-- one generic "sponsor" label so the ledger's audit trail and any future
+-- SEC-filing logic can tell which pathway a given proposal is actually on.
 data OrgRole
   = FundManager
   | IssuingHouse
@@ -12,6 +22,7 @@ data OrgRole
   | Custodian
   | Distributor
   | SEC
+  | Issuer
   deriving (Eq, Show)
 
 -- | One Daml party per organization (docs/implementation_plan.md §3.3,

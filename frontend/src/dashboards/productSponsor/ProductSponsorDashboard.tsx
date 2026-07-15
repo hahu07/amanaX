@@ -8,19 +8,25 @@ import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
 import { IconFileText, IconLayers, IconPlus, IconShield } from "../../components/icons";
 import { useAuth } from "../../auth/AuthContext";
+import { ROLE_LABEL } from "../../auth/types";
 import { useOrganizations } from "../../hooks/useOrganizations";
 import { useProposals } from "../../hooks/useProposals";
 import { useStructures } from "../../hooks/useStructures";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType } from "../../api/productsApi";
 import { formatNGN } from "../../lib/format";
-import styles from "./FundManagerDashboard.module.css";
+import styles from "./ProductSponsorDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Proposals", active: true, icon: <IconFileText /> },
   { label: "Reports", disabled: true, icon: <IconShield /> },
 ];
 
-export default function FundManagerDashboard() {
+// Shared by both product-sponsoring roles (auth/types.ts ROLE_ROUTE
+// comment) — a Fund Manager (Collective Investment Scheme pathway) and a
+// corporate Issuer (public-offer/Sukuk-issuance pathway) use the exact
+// same propose/withdraw/review-structures workflow; only the on-ledger
+// sponsorType and the role label shown here differ.
+export default function ProductSponsorDashboard() {
   const { auth } = useAuth();
   const token = auth!.token;
 
@@ -129,7 +135,7 @@ export default function FundManagerDashboard() {
   return (
     <AppShell navItems={NAV_ITEMS} pageLabel="Proposals">
       <PageHeader
-        title="Fund Manager"
+        title={ROLE_LABEL[auth!.role]}
         description="Propose new Shariah-compliant investment products and track them through structuring."
       />
 

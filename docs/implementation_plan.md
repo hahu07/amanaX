@@ -165,8 +165,8 @@ Drafted so DAML work in Milestone 1+ isn't blocked on a design meeting — treat
 | Template | Signatory | Controller(s) | Observer(s) |
 |---|---|---|---|
 | `Organization` / `User` | Platform Operator | Platform Operator | the org itself |
-| `ProductProposal` | Fund Manager org | Fund Manager (create/withdraw) | Issuing House |
-| `ProductStructure` | Fund Manager org, Issuing House org (propose-accept) | Issuing House (finalize) | Shariah Advisor, Trustee |
+| `ProductProposal` | sponsor org — Fund Manager or Issuer (`sponsorType`, decided 2026-07-15) | sponsor (create/withdraw) | Issuing House |
+| `ProductStructure` | sponsor org, Issuing House org (propose-accept) | Issuing House (finalize) | Shariah Advisor, Trustee |
 | `ShariahReview` | Shariah Advisor org, Issuing House org | Shariah Advisor (certify/reject) | Trustee, Fund Manager |
 | `TrusteeReview` | Trustee org, Issuing House org | Trustee (approve/reject) | Fund Manager, SEC (readiness view only) |
 | `RegulatorySubmission` | Issuing House org | Issuing House (submit) | SEC |

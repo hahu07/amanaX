@@ -1,11 +1,17 @@
 module AmanaX.Product.ProductStructure where
 
+import AmanaX.Identity.Organization (OrgRole(..))
 import AmanaX.Product.Types
 
 -- | Created by the Issuing House exercising ProductProposal_Structure
--- (propose-accept: docs/implementation_plan.md §3.5 — "Fund Manager org,
--- Issuing House org (propose-accept)"). Both are signatories from creation;
--- the Issuing House alone controls further terms edits and finalization.
+-- (propose-accept: docs/implementation_plan.md §3.5 — "sponsor org
+-- (Fund Manager or Issuer), Issuing House org (propose-accept)"). Both
+-- are signatories from creation; the Issuing House alone controls further
+-- terms edits and finalization. `sponsorType` carries through from the
+-- proposal (§3.3/OrgRole comment) — recorded at creation time rather than
+-- re-derived from the Organization contract later, so the historical
+-- record stays correct even if an org's role were ever administratively
+-- changed after the fact.
 --
 -- No Shariah Advisor / Trustee observers yet — Daml requires archive+
 -- recreate to broaden a contract's observers, and Milestone 3 (Shariah &
@@ -13,7 +19,8 @@ import AmanaX.Product.Types
 -- for review, so that's the natural point to add them, not here.
 template ProductStructure
   with
-    fundManager : Party
+    sponsor : Party
+    sponsorType : OrgRole
     issuingHouse : Party
     productName : Text
     description : Text
@@ -25,9 +32,10 @@ template ProductStructure
     redemptionTerms : Text
     status : ProductStructureStatus
   where
-    signatory fundManager, issuingHouse
+    signatory sponsor, issuingHouse
 
     ensure productName /= "" && targetSizeNGN > 0.0 && tenorMonths > 0 && minSubscriptionNGN >= 0.0
+      && (sponsorType == FundManager || sponsorType == Issuer)
 
     choice ProductStructure_UpdateTerms : ContractId ProductStructure
       with

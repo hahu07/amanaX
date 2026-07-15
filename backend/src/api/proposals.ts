@@ -25,26 +25,36 @@ const createProposalSchema = z.object({
   tenorMonths: z.number().int().positive(),
 });
 
-proposalsRouter.post("/proposals", requireRole("FundManager"), async (req, res) => {
+// Both FundManager and Issuer orgs can sponsor a proposal — two distinct
+// regulatory actors under Nigerian SEC rules (Collective Investment Scheme
+// vs. public-offer/Sukuk-issuance), see the OrgRole comment in
+// Organization.daml. sponsorType is set from the caller's own authenticated
+// role, never taken from the request body — a proposal can't misrepresent
+// who actually sponsored it.
+proposalsRouter.post("/proposals", requireRole("FundManager", "Issuer"), async (req, res) => {
   const parsed = createProposalSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });
     return;
   }
-  const proposal = await createProposal({ fundManager: requireOrgParty(req), ...parsed.data });
+  const proposal = await createProposal({
+    sponsor: requireOrgParty(req),
+    sponsorType: req.auth!.role as "FundManager" | "Issuer",
+    ...parsed.data,
+  });
   res.status(201).json(proposal);
 });
 
-// Both sides of the propose-accept see the same list — the Fund Manager as
+// Every side of the propose-accept sees the same list — the sponsor as
 // signatory, the Issuing House as observer, so querying by "my org party"
-// returns the right rows for either.
-proposalsRouter.get("/proposals", requireRole("FundManager", "IssuingHouse"), async (req, res) => {
+// returns the right rows for any of them.
+proposalsRouter.get("/proposals", requireRole("FundManager", "Issuer", "IssuingHouse"), async (req, res) => {
   const proposals = await listProposals(requireOrgParty(req));
   res.status(200).json(proposals);
 });
 
-proposalsRouter.post("/proposals/:contractId/withdraw", requireRole("FundManager"), async (req, res) => {
-  await withdrawProposal({ fundManager: requireOrgParty(req), contractId: req.params.contractId });
+proposalsRouter.post("/proposals/:contractId/withdraw", requireRole("FundManager", "Issuer"), async (req, res) => {
+  await withdrawProposal({ sponsor: requireOrgParty(req), contractId: req.params.contractId });
   res.status(204).end();
 });
 

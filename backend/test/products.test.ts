@@ -12,7 +12,7 @@ let fundManagerParty: string;
 let issuingHouseToken: string;
 let issuingHouseParty: string;
 
-async function onboardOrgAndLogin(role: "FundManager" | "IssuingHouse", label: string) {
+async function onboardOrgAndLogin(role: "FundManager" | "IssuingHouse" | "Issuer", label: string) {
   const orgRes = await request(app)
     .post("/orgs")
     .set("Authorization", `Bearer ${operatorToken}`)
@@ -58,7 +58,8 @@ describe("product proposal + structuring workflow", () => {
         tenorMonths: 24,
       });
     expect(proposeRes.status).toBe(201);
-    expect(proposeRes.body.fundManager).toBe(fundManagerParty);
+    expect(proposeRes.body.sponsor).toBe(fundManagerParty);
+    expect(proposeRes.body.sponsorType).toBe("FundManager");
     expect(proposeRes.body.issuingHouse).toBe(issuingHouseParty);
 
     const fmListRes = await request(app).get("/proposals").set("Authorization", `Bearer ${fundManagerToken}`);
@@ -199,5 +200,38 @@ describe("product proposal + structuring workflow", () => {
     const listRes = await request(app).get("/proposals").set("Authorization", `Bearer ${fundManagerToken}`);
     expect(listRes.body.some((p: { contractId: string }) => p.contractId === withdrawTarget.body.contractId)).toBe(false);
     expect(listRes.body.some((p: { contractId: string }) => p.contractId === rejectTarget.body.contractId)).toBe(false);
+  });
+
+  it("lets a corporate Issuer (not just a Fund Manager) sponsor a proposal, with sponsorType recorded server-side", async () => {
+    const issuer = await onboardOrgAndLogin("Issuer", "Products Test Issuer");
+
+    const proposeRes = await request(app)
+      .post("/proposals")
+      .set("Authorization", `Bearer ${issuer.token}`)
+      .send({
+        issuingHouse: issuingHouseParty,
+        productName: "Corporate Sukuk Financing",
+        description: "Asset-backed Sukuk to finance the issuer's working capital.",
+        proposedType: "Murabahah",
+        targetSizeNGN: 750000000,
+        tenorMonths: 12,
+      });
+    expect(proposeRes.status).toBe(201);
+    expect(proposeRes.body.sponsor).toBe(issuer.party);
+    expect(proposeRes.body.sponsorType).toBe("Issuer");
+
+    const structureRes = await request(app)
+      .post(`/proposals/${proposeRes.body.contractId}/structure`)
+      .set("Authorization", `Bearer ${issuingHouseToken}`)
+      .send({
+        structureType: "Murabahah",
+        profitMechanism: "Fixed cost-plus markup",
+        minSubscriptionNGN: 5000000,
+        redemptionTerms: "Bullet repayment at maturity",
+        structureTenorMonths: 12,
+      });
+    expect(structureRes.status).toBe(201);
+    expect(structureRes.body.sponsor).toBe(issuer.party);
+    expect(structureRes.body.sponsorType).toBe("Issuer");
   });
 });

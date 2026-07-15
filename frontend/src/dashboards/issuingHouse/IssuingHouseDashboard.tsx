@@ -323,7 +323,9 @@ export default function IssuingHouseDashboard() {
       render: (p) => (
         <div className={styles.productCell}>
           <span className={styles.productName}>{p.productName}</span>
-          <span className={styles.productMeta}>from {orgName(p.fundManager)}</span>
+          <span className={styles.productMeta}>
+            from {orgName(p.sponsor)} <StatusBadge tone="outline">{p.sponsorType === "Issuer" ? "Issuer" : "Fund Manager"}</StatusBadge>
+          </span>
         </div>
       ),
     },
@@ -351,7 +353,9 @@ export default function IssuingHouseDashboard() {
       render: (s) => (
         <div className={styles.productCell}>
           <span className={styles.productName}>{s.productName}</span>
-          <span className={styles.productMeta}>with {orgName(s.fundManager)}</span>
+          <span className={styles.productMeta}>
+            with {orgName(s.sponsor)} <StatusBadge tone="outline">{s.sponsorType === "Issuer" ? "Issuer" : "Fund Manager"}</StatusBadge>
+          </span>
         </div>
       ),
     },
@@ -409,7 +413,7 @@ export default function IssuingHouseDashboard() {
               <IconFileText /> Proposals ({proposals.data.length})
             </span>
           }
-          description="Products Fund Managers have proposed to your institution."
+          description="Products Fund Managers and Issuers have proposed to your institution."
         />
         <CardBody flush>
           <DataTable
@@ -417,7 +421,7 @@ export default function IssuingHouseDashboard() {
             rows={proposals.data}
             keyExtractor={(p) => p.contractId}
             emptyTitle="No incoming proposals"
-            emptyDescription="Proposals from Fund Managers will appear here."
+            emptyDescription="Proposals from Fund Managers and Issuers will appear here."
           />
         </CardBody>
         {reviewingId && (() => {

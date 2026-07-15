@@ -67,5 +67,18 @@ Signed in as a Fund Manager, submitted a real proposal (₦500,000,000, 6-month 
 ## How to run this locally
 Same as [milestone-1.md](milestone-1.md) — all four services (`dpm sandbox`, `backend`, `agents`, `frontend`) need to be running. No new environment variables.
 
+## Post-milestone correction (2026-07-15): the Issuer role
+
+Product-owner review of this milestone raised a real gap: `ProductProposal` only let a `FundManager`-role org propose, but a Fund Manager (Collective Investment Scheme regulation — pools investor capital into a fund it continues to manage) and a corporate raising financing directly against its own balance sheet (public-offer/Sukuk-issuance regulation, no ongoing fund-management role) are legally distinct actors under Nigerian SEC rules. Conflating them under one role would have misrepresented who's actually accountable for what in the on-ledger audit trail and in any future SEC-filing logic.
+
+Fixed by adding a genuine second role rather than just relabeling:
+- `OrgRole` gains `Issuer`. `ProductProposal`/`ProductStructure` renamed `fundManager` → `sponsor`, and gained `sponsorType : OrgRole` (reuses `OrgRole` rather than a parallel type, guarded by an `ensure` clause to only `FundManager`/`Issuer`), recorded at creation time so the historical record stays correct even if an org's role were ever changed later.
+- Backend: `sponsorType` is derived from the caller's own authenticated role, never accepted from the request body — a proposal can't misrepresent who sponsored it.
+- Frontend: `FundManagerDashboard` renamed to a role-agnostic `dashboards/productSponsor/ProductSponsorDashboard`, mounted at both `/dashboard/fund-manager` and `/dashboard/issuer` (same workflow, different label) — reuse over forking a near-identical component. The Issuing House's proposal/structure tables now show a `sponsorType` badge ("Fund Manager" / "Issuer") next to the sponsor's name.
+- Added a Daml Script test (`issuerSponsoredProposalTest`) and a backend integration test proving an Issuer-sponsored proposal works through the identical propose → structure lifecycle, and verified live in a browser: an Issuer org proposed a corporate Sukuk financing product, and the Issuing House's dashboard correctly showed "from Acme Manufacturing Plc **Issuer**" — visually distinct from a Fund Manager proposal.
+- `docs/implementation_plan.md` §3.5 authorization table updated to say "sponsor org — Fund Manager or Issuer" instead of "Fund Manager org."
+
+All 26 automated tests (5 DAML, 11 backend, 10 agents — agents untouched, verified as regression-clean) pass; frontend production build is clean.
+
 ## Next
 Milestone 3 — Shariah & Trustee review (`ShariahReview`, `TrusteeReview`; Issuing House submits a Finalized structure for review, broadening its observers to the relevant Shariah Advisor and Trustee orgs; Compliance Agent readiness checklist wired in).

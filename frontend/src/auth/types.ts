@@ -6,6 +6,7 @@ export const ORG_ROLES = [
   "Custodian",
   "Distributor",
   "SEC",
+  "Issuer",
 ] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
@@ -18,7 +19,11 @@ export interface AuthState {
   party: string | null;
 }
 
-// Maps a backend role to its dashboard route segment.
+// Maps a backend role to its dashboard route segment. FundManager and
+// Issuer are both product "sponsors" (see productsApi.ts) and share the
+// same dashboard component (dashboards/productSponsor) — distinct roles,
+// same UI, since the workflow is identical and only the regulatory
+// pathway differs.
 export const ROLE_ROUTE: Record<Role, string> = {
   PlatformOperator: "operator",
   FundManager: "fund-manager",
@@ -28,6 +33,7 @@ export const ROLE_ROUTE: Record<Role, string> = {
   Custodian: "custodian",
   Distributor: "distributor",
   SEC: "sec",
+  Issuer: "issuer",
 };
 
 // Human-readable label for a backend role — used across the UI (top bar,
@@ -41,4 +47,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   Custodian: "Custodian",
   Distributor: "Distributor",
   SEC: "SEC",
+  Issuer: "Issuer",
 };

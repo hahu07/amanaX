@@ -2,6 +2,7 @@ module AmanaX.Product.ProductWorkflowTest where
 
 import DA.Assert ((===))
 import Daml.Script
+import AmanaX.Identity.Organization (OrgRole(..))
 import AmanaX.Product.Types
 import AmanaX.Product.ProductProposal
 import AmanaX.Product.ProductStructure
@@ -16,7 +17,8 @@ proposeStructureFinalizeTest = do
 
   proposalCid <- submit fundManager do
     createCmd ProductProposal with
-      fundManager
+      sponsor = fundManager
+      sponsorType = FundManager
       issuingHouse
       productName = "AmanaX Sukuk Note I"
       description = "A Shariah-compliant Ijarah-backed investment note."
@@ -37,10 +39,11 @@ proposeStructureFinalizeTest = do
     None -> error "expected structure to exist"
     Some s -> do
       s.status === ProductStructure_Draft
-      s.fundManager === fundManager
+      s.sponsor === fundManager
+      s.sponsorType === FundManager
       s.issuingHouse === issuingHouse
 
-  -- proposal is consumed — the Fund Manager can no longer see it as active
+  -- proposal is consumed — the sponsor can no longer see it as active
   proposalStillActive <- queryContractId fundManager proposalCid
   proposalStillActive === None
 
@@ -71,6 +74,40 @@ proposeStructureFinalizeTest = do
       newRedemptionTerms = "should fail"
       newTenorMonths = 1
 
+-- | A corporate Issuer (not a Fund Manager) can sponsor a proposal through
+-- the exact same lifecycle — proving the propose-accept flow and
+-- sponsorType are correctly generalized, not just renamed.
+issuerSponsoredProposalTest : Script ()
+issuerSponsoredProposalTest = do
+  issuer <- allocateParty "CorporateIssuerCo"
+  issuingHouse <- allocateParty "IssuingHouseCo3"
+
+  proposalCid <- submit issuer do
+    createCmd ProductProposal with
+      sponsor = issuer
+      sponsorType = Issuer
+      issuingHouse
+      productName = "Corporate Sukuk Financing"
+      description = "Asset-backed Sukuk to finance the issuer's working capital."
+      proposedType = Murabahah
+      targetSizeNGN = 750000000.0
+      tenorMonths = 12
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Murabahah
+      profitMechanism = "Fixed cost-plus markup"
+      minSubscriptionNGN = 5000000.0
+      redemptionTerms = "Bullet repayment at maturity"
+      structureTenorMonths = 12
+
+  structure <- queryContractId issuingHouse structureCid
+  case structure of
+    None -> error "expected structure to exist"
+    Some s -> do
+      s.sponsor === issuer
+      s.sponsorType === Issuer
+
 -- | Fund Manager can withdraw a proposal before the Issuing House acts on
 -- it; Issuing House can reject one instead of structuring it.
 withdrawAndRejectTest : Script ()
@@ -80,7 +117,8 @@ withdrawAndRejectTest = do
 
   withdrawnCid <- submit fundManager do
     createCmd ProductProposal with
-      fundManager
+      sponsor = fundManager
+      sponsorType = FundManager
       issuingHouse
       productName = "Withdrawn Note"
       description = "Will be withdrawn."
@@ -93,7 +131,8 @@ withdrawAndRejectTest = do
 
   rejectedCid <- submit fundManager do
     createCmd ProductProposal with
-      fundManager
+      sponsor = fundManager
+      sponsorType = FundManager
       issuingHouse
       productName = "Rejected Note"
       description = "Will be rejected."
@@ -107,7 +146,8 @@ withdrawAndRejectTest = do
   -- Fund Manager cannot structure their own proposal (not the controller)
   proposalCid <- submit fundManager do
     createCmd ProductProposal with
-      fundManager
+      sponsor = fundManager
+      sponsorType = FundManager
       issuingHouse
       productName = "Guarded Note"
       description = "Fund Manager should not be able to structure this."

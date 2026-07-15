@@ -1,19 +1,25 @@
 module AmanaX.Product.ProductProposal where
 
+import AmanaX.Identity.Organization (OrgRole(..))
 import AmanaX.Product.Types
 import AmanaX.Product.ProductStructure
 
--- | Step 1 of the MVP workflow (docs/prompt.md): a Fund Manager proposes a
--- new Islamic Investment Product to a specific Issuing House. Signatory is
--- the Fund Manager alone; the Issuing House is only an observer until it
--- exercises ProductProposal_Structure, at which point both become
--- signatories on the resulting ProductStructure (propose-accept, §3.5).
+-- | Step 1 of the MVP workflow (docs/prompt.md): a product sponsor —
+-- either a Fund Manager (Collective Investment Scheme pathway) or an
+-- Issuer (corporate raising financing against its own balance sheet,
+-- public-offer/Sukuk-issuance pathway; see the OrgRole comment in
+-- Organization.daml) — proposes a new Islamic Investment Product to a
+-- specific Issuing House. Signatory is the sponsor alone; the Issuing
+-- House is only an observer until it exercises ProductProposal_Structure,
+-- at which point both become signatories on the resulting
+-- ProductStructure (propose-accept, §3.5).
 --
 -- Standard propose-accept choice triple (Accept/Reject/Cancel, per §2 of
 -- docs/implementation_plan.md) maps here to Structure/Reject/Withdraw.
 template ProductProposal
   with
-    fundManager : Party
+    sponsor : Party
+    sponsorType : OrgRole
     issuingHouse : Party
     productName : Text
     description : Text
@@ -21,13 +27,14 @@ template ProductProposal
     targetSizeNGN : Decimal
     tenorMonths : Int
   where
-    signatory fundManager
+    signatory sponsor
     observer issuingHouse
 
     ensure productName /= "" && targetSizeNGN > 0.0 && tenorMonths > 0
+      && (sponsorType == FundManager || sponsorType == Issuer)
 
     choice ProductProposal_Withdraw : ()
-      controller fundManager
+      controller sponsor
       do pure ()
 
     choice ProductProposal_Reject : ()
@@ -48,7 +55,8 @@ template ProductProposal
       controller issuingHouse
       do
         create ProductStructure with
-          fundManager
+          sponsor
+          sponsorType
           issuingHouse
           productName
           description

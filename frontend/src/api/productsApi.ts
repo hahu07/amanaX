@@ -5,9 +5,17 @@ export type ProductType = (typeof PRODUCT_TYPES)[number];
 
 export type ProductStructureStatus = "ProductStructure_Draft" | "ProductStructure_Finalized";
 
+// The two OrgRoles allowed to sponsor a proposal — a Fund Manager
+// (Collective Investment Scheme pathway) or a corporate Issuer
+// (public-offer/Sukuk-issuance pathway, raising financing against its own
+// balance sheet). See auth/types.ts and the OrgRole comment in
+// Organization.daml for the full rationale.
+export type SponsorType = "FundManager" | "Issuer";
+
 export interface ProductProposal {
   contractId: string;
-  fundManager: string;
+  sponsor: string;
+  sponsorType: SponsorType;
   issuingHouse: string;
   productName: string;
   description: string;
@@ -18,7 +26,8 @@ export interface ProductProposal {
 
 export interface ProductStructure {
   contractId: string;
-  fundManager: string;
+  sponsor: string;
+  sponsorType: SponsorType;
   issuingHouse: string;
   productName: string;
   description: string;
