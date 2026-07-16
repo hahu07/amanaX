@@ -13,8 +13,11 @@ import { useProposals } from "../../hooks/useProposals";
 import { useStructures } from "../../hooks/useStructures";
 import { useShariahReviews } from "../../hooks/useShariahReviews";
 import { useTrusteeReviews } from "../../hooks/useTrusteeReviews";
+import { useRegulatorySubmissions } from "../../hooks/useRegulatorySubmissions";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType, type StructuringRecommendation } from "../../api/productsApi";
 import type { ComplianceAssessment, ShariahReviewItem, TrusteeReviewItem } from "../../api/reviewsApi";
+import type { FilingDocument, RegulatorySubmissionItem } from "../../api/regulatoryApi";
+import { ApiError } from "../../api/backendClient";
 import { formatNGN } from "../../lib/format";
 import styles from "./IssuingHouseDashboard.module.css";
 
@@ -22,7 +25,8 @@ const NAV_ITEMS = [
   { label: "Proposals", active: true, icon: <IconFileText /> },
   { label: "Structures", active: true, icon: <IconLayers /> },
   { label: "Reviews", active: true, icon: <IconClipboardCheck /> },
-  { label: "Reports", disabled: true, icon: <IconShield /> },
+  { label: "Filings", active: true, icon: <IconShield /> },
+  { label: "Reports", disabled: true, icon: <IconFileText /> },
 ];
 
 interface StructureFormState {
@@ -52,11 +56,13 @@ export default function IssuingHouseDashboard() {
   const structures = useStructures(token);
   const shariahReviews = useShariahReviews(token);
   const trusteeReviews = useTrusteeReviews(token);
+  const regulatorySubmissions = useRegulatorySubmissions(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
   const shariahAdvisors = orgs.data.filter((o) => o.role === "ShariahAdvisor" && o.active);
   const trustees = orgs.data.filter((o) => o.role === "Trustee" && o.active);
+  const secOrgs = orgs.data.filter((o) => o.role === "SEC" && o.active);
 
   // --- Proposal review (AI recommendation + initial structuring) ---
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -245,7 +251,64 @@ export default function IssuingHouseDashboard() {
     }
   }
 
-  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error ?? shariahReviews.error ?? trusteeReviews.error;
+  // --- Step 8: generate the filing pack and submit to the SEC (only once compliance-ready) ---
+  const [filingPack, setFilingPack] = useState<FilingDocument[] | null>(null);
+  const [filingPackLoading, setFilingPackLoading] = useState(false);
+  const [secParty, setSecParty] = useState("");
+
+  async function handleGenerateFilingPack(review: TrusteeReviewItem) {
+    setActionError(null);
+    setFilingPack(null);
+    setFilingPackLoading(true);
+    try {
+      const res = await regulatorySubmissions.generatePack(review.contractId);
+      setFilingPack(res.output);
+    } catch {
+      setActionError("Could not reach the Documentation Agent.");
+    } finally {
+      setFilingPackLoading(false);
+    }
+  }
+
+  async function handleSubmitToSec(e: FormEvent, review: TrusteeReviewItem) {
+    e.preventDefault();
+    setActionError(null);
+    try {
+      await regulatorySubmissions.submit(review.contractId, secParty);
+      setComplianceId(null);
+      setFilingPack(null);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        try {
+          const body = JSON.parse(err.message) as { compliance: ComplianceAssessment };
+          setCompliance(body.compliance);
+          setActionError("No longer ready for SEC submission — see the updated Compliance Agent assessment above.");
+          return;
+        } catch {
+          // fall through to the generic error below
+        }
+      }
+      setActionError("Could not submit this filing to the SEC.");
+    }
+  }
+
+  async function handleWithdrawSubmission(submission: RegulatorySubmissionItem) {
+    setActionError(null);
+    try {
+      await regulatorySubmissions.withdraw(submission.contractId);
+    } catch {
+      setActionError("Could not withdraw this submission.");
+    }
+  }
+
+  const error =
+    actionError ??
+    orgs.error ??
+    proposals.error ??
+    structures.error ??
+    shariahReviews.error ??
+    trusteeReviews.error ??
+    regulatorySubmissions.error;
   const draftStructures = structures.data.filter((s) => s.status === "ProductStructure_Draft");
   const finalizedStructures = structures.data.filter((s) => s.status === "ProductStructure_Finalized");
   const pendingShariahReviews = shariahReviews.data.filter((r) => r.status === "Pending");
@@ -750,59 +813,162 @@ export default function IssuingHouseDashboard() {
             emptyDescription="Submit a certified Shariah review above to see it here."
           />
         </CardBody>
-        {complianceId && (
-          <div className={styles.reviewPanel}>
-            <div className={styles.compliancePanel}>
-              <div className={styles.complianceHead}>
-                <span className={styles.complianceTitle}>
-                  <IconClipboardCheck /> AI Compliance Agent
-                </span>
-                {compliance && (
-                  <StatusBadge tone={compliance.readyForSubmission ? "success" : "warning"}>
-                    {compliance.readyForSubmission ? "Ready for submission" : "Not yet ready"}
-                  </StatusBadge>
+        {complianceId &&
+          (() => {
+            const review = approvedTrusteeReviews.find((r) => r.contractId === complianceId);
+            if (!review) return null;
+            return (
+              <div className={styles.reviewPanel}>
+                <div className={styles.compliancePanel}>
+                  <div className={styles.complianceHead}>
+                    <span className={styles.complianceTitle}>
+                      <IconClipboardCheck /> AI Compliance Agent
+                    </span>
+                    {compliance && (
+                      <StatusBadge tone={compliance.readyForSubmission ? "success" : "warning"}>
+                        {compliance.readyForSubmission ? "Ready for submission" : "Not yet ready"}
+                      </StatusBadge>
+                    )}
+                  </div>
+                  {complianceLoading && <p className={styles.complianceEmpty}>Consulting the assistant…</p>}
+                  {compliance && (
+                    <>
+                      <div className={styles.complianceSection}>
+                        <div className={styles.complianceSectionLabel}>Workflow gaps</div>
+                        {compliance.workflowGaps.length === 0 ? (
+                          <p className={styles.complianceEmpty}>None.</p>
+                        ) : (
+                          <ul className={styles.complianceList}>
+                            {compliance.workflowGaps.map((g) => (
+                              <li key={g}>{g}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className={styles.complianceSection}>
+                        <div className={styles.complianceSectionLabel}>Shariah checklist gaps</div>
+                        {compliance.shariahChecklistGaps.length === 0 ? (
+                          <p className={styles.complianceEmpty}>None.</p>
+                        ) : (
+                          <ul className={styles.complianceList}>
+                            {compliance.shariahChecklistGaps.map((g) => (
+                              <li key={g}>{g}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div className={styles.complianceSection}>
+                        <div className={styles.complianceSectionLabel}>Documents still needed for SEC filing</div>
+                        <ul className={styles.complianceList}>
+                          {compliance.missingDocuments.map((d) => (
+                            <li key={d}>{d}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {compliance?.readyForSubmission && (
+                  <>
+                    <Button size="sm" variant="secondary" onClick={() => handleGenerateFilingPack(review)}>
+                      {filingPackLoading ? "Generating…" : filingPack ? "Regenerate filing pack" : "Generate filing pack"}
+                    </Button>
+
+                    {filingPack && (
+                      <div className={styles.documentsList}>
+                        {filingPack.map((doc) => (
+                          <details key={doc.kind} className={styles.documentItem}>
+                            <summary>{doc.title}</summary>
+                            <pre className={styles.documentMarkdown}>{doc.markdown}</pre>
+                          </details>
+                        ))}
+                      </div>
+                    )}
+
+                    {filingPack && (
+                      <form className={styles.form} onSubmit={(e) => handleSubmitToSec(e, review)}>
+                        <div className={styles.field}>
+                          <label htmlFor="secParty">SEC</label>
+                          <select id="secParty" required value={secParty} onChange={(e) => setSecParty(e.target.value)}>
+                            <option value="" disabled>
+                              Select…
+                            </option>
+                            {secOrgs.map((org) => (
+                              <option key={org.contractId} value={org.party}>
+                                {org.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className={styles.formActions}>
+                          <Button type="submit" variant="primary" disabled={secOrgs.length === 0}>
+                            Submit to SEC
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                    {secOrgs.length === 0 && <Alert tone="neutral">No active SEC org is onboarded yet — ask the Platform Operator to add one.</Alert>}
+                  </>
                 )}
               </div>
-              {complianceLoading && <p className={styles.complianceEmpty}>Consulting the assistant…</p>}
-              {compliance && (
-                <>
-                  <div className={styles.complianceSection}>
-                    <div className={styles.complianceSectionLabel}>Workflow gaps</div>
-                    {compliance.workflowGaps.length === 0 ? (
-                      <p className={styles.complianceEmpty}>None.</p>
-                    ) : (
-                      <ul className={styles.complianceList}>
-                        {compliance.workflowGaps.map((g) => (
-                          <li key={g}>{g}</li>
-                        ))}
-                      </ul>
-                    )}
+            );
+          })()}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconShield /> Regulatory submissions ({regulatorySubmissions.data.length})
+            </span>
+          }
+          description="Applications filed with the SEC."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (s: RegulatorySubmissionItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{s.productName}</span>
+                    <span className={styles.productMeta}>with {orgName(s.sec)}</span>
                   </div>
-                  <div className={styles.complianceSection}>
-                    <div className={styles.complianceSectionLabel}>Shariah checklist gaps</div>
-                    {compliance.shariahChecklistGaps.length === 0 ? (
-                      <p className={styles.complianceEmpty}>None.</p>
-                    ) : (
-                      <ul className={styles.complianceList}>
-                        {compliance.shariahChecklistGaps.map((g) => (
-                          <li key={g}>{g}</li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className={styles.complianceSection}>
-                    <div className={styles.complianceSectionLabel}>Documents still needed for SEC filing</div>
-                    <ul className={styles.complianceList}>
-                      {compliance.missingDocuments.map((d) => (
-                        <li key={d}>{d}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        )}
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (s: RegulatorySubmissionItem) => (
+                  <StatusBadge tone={s.status === "Approved" ? "success" : "warning"}>{s.status}</StatusBadge>
+                ),
+              },
+              {
+                key: "reference",
+                header: "Approval reference",
+                mono: true,
+                render: (s: RegulatorySubmissionItem) => s.approvalReference ?? "—",
+              },
+              {
+                key: "actions",
+                header: "",
+                align: "right",
+                render: (s: RegulatorySubmissionItem) =>
+                  s.status === "Pending" ? (
+                    <Button size="sm" variant="danger" onClick={() => handleWithdrawSubmission(s)}>
+                      Withdraw
+                    </Button>
+                  ) : null,
+              },
+            ]}
+            rows={regulatorySubmissions.data}
+            keyExtractor={(s) => s.contractId}
+            emptyTitle="No regulatory submissions yet"
+            emptyDescription="Submit to the SEC above to see it here."
+          />
+        </CardBody>
       </Card>
     </AppShell>
   );

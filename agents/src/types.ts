@@ -63,7 +63,12 @@ export type AgentName = "product-structuring" | "compliance" | "documentation";
 
 export interface InvokeResponse {
   agent: AgentName;
-  output: StructuringRecommendation | ComplianceAssessment | GeneratedDocument;
+  // The documentation agent returns the whole filing pack (term sheet,
+  // investment summary, approval pack, regulatory filing) in one call —
+  // docs/prompt.md's Documentation Agent is explicitly plural ("term
+  // sheets, investment summaries, approval packs, regulatory filing
+  // documents"), so this is an array, not a single document.
+  output: StructuringRecommendation | ComplianceAssessment | GeneratedDocument[];
   model: string;
   timestamp: string;
 }

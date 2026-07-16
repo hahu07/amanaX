@@ -1,0 +1,106 @@
+module AmanaX.Regulatory.Regulatory where
+
+import AmanaX.Product.Types (ProductType)
+import AmanaX.Product.ProductStructure (ProductStructure)
+import AmanaX.Review.Review (TrusteeReview)
+
+-- | One generated filing document (term sheet, investment summary,
+-- approval pack, or regulatory filing — docs/prompt.md's Documentation
+-- Agent). Content is generated off-ledger by the agents service and
+-- attached here at submission time, per docs/implementation_plan.md §3.4:
+-- "only a human-approved version is attached to the on-ledger
+-- RegulatorySubmission." Kept as a plain record, not a separate template —
+-- these are immutable snapshots of what was actually filed, not
+-- independently-authorized entities of their own.
+data FilingDocument = FilingDocument
+  with
+    kind : Text
+    title : Text
+    markdown : Text
+  deriving (Eq, Show)
+
+-- | Step 8-9 of the MVP workflow (docs/prompt.md): the Issuing House
+-- submits the approved deal to the SEC; the SEC approves or rejects.
+-- Same propose-accept shape as Review.daml's two stages, but only needs
+-- one template pair since there's no further chained stage after this —
+-- SECApproval is the terminal record (Step 10, "Investment Note is
+-- issued," is Milestone 5). Both templates live in this module because
+-- SECApproval is the choice's return type — same-module, not cross-module
+-- circular like Review.daml, but consistent with that file's style.
+template RegulatorySubmission
+  with
+    issuingHouse : Party
+    sec : Party
+    sponsor : Party
+    trustee : Party
+    structureCid : ContractId ProductStructure
+    trusteeReviewCid : ContractId TrusteeReview
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    certificationNotes : Text
+    approvalNotes : Text
+    documents : [FilingDocument]
+  where
+    signatory issuingHouse
+    observer sec, sponsor, trustee
+
+    choice RegulatorySubmission_Withdraw : ()
+      controller issuingHouse
+      do pure ()
+
+    choice RegulatorySubmission_Reject : ()
+      with rejectionReason : Text
+      controller sec
+      do pure ()
+
+    choice RegulatorySubmission_Approve : ContractId SECApproval
+      with approvalReference : Text
+      controller sec
+      do
+        create SECApproval with
+          issuingHouse
+          sec
+          sponsor
+          trustee
+          structureCid
+          productName
+          description
+          structureType
+          targetSizeNGN
+          tenorMonths
+          profitMechanism
+          minSubscriptionNGN
+          redemptionTerms
+          certificationNotes
+          approvalNotes
+          documents
+          approvalReference
+
+template SECApproval
+  with
+    issuingHouse : Party
+    sec : Party
+    sponsor : Party
+    trustee : Party
+    structureCid : ContractId ProductStructure
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    certificationNotes : Text
+    approvalNotes : Text
+    documents : [FilingDocument]
+    approvalReference : Text
+  where
+    signatory issuingHouse, sec
+    observer sponsor, trustee

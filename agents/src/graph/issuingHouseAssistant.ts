@@ -32,7 +32,7 @@ async function complianceNode(state: AssistantStateType): Promise<Partial<Assist
 
 async function documentationNode(state: AssistantStateType): Promise<Partial<AssistantStateType>> {
   const output = await runDocumentationAgent(state.context);
-  return { result: { agent: "documentation", output, model: "stub-milestone-0", timestamp: new Date().toISOString() } };
+  return { result: { agent: "documentation", output, model: "rule-based-v1", timestamp: new Date().toISOString() } };
 }
 
 function route(state: AssistantStateType): "productStructuring" | "compliance" | "documentation" {

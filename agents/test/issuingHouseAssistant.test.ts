@@ -32,13 +32,19 @@ describe("POST /internal/assistant/issuing-house/invoke", () => {
     expect(res.body.output).toHaveProperty("readyForSubmission");
   });
 
-  it("routes intent=generate-documents to the documentation agent", async () => {
+  it("routes intent=generate-documents to the documentation agent, returning the full filing pack", async () => {
     const res = await request(app)
       .post("/internal/assistant/issuing-house/invoke")
       .send({ dealId: "deal-1", intent: "generate-documents", context: baseContext });
     expect(res.status).toBe(200);
     expect(res.body.agent).toBe("documentation");
-    expect(res.body.output.kind).toBe("TermSheet");
+    expect(Array.isArray(res.body.output)).toBe(true);
+    expect(res.body.output.map((d: { kind: string }) => d.kind)).toEqual([
+      "TermSheet",
+      "InvestmentSummary",
+      "ApprovalPack",
+      "RegulatoryFiling",
+    ]);
   });
 
   it("rejects a malformed request", async () => {
