@@ -12,12 +12,15 @@ import { ROLE_LABEL } from "../../auth/types";
 import { useOrganizations } from "../../hooks/useOrganizations";
 import { useProposals } from "../../hooks/useProposals";
 import { useStructures } from "../../hooks/useStructures";
+import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType } from "../../api/productsApi";
+import type { InvestmentNote } from "../../api/investmentNotesApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./ProductSponsorDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Proposals", active: true, icon: <IconFileText /> },
+  { label: "Notes", active: true, icon: <IconLayers /> },
   { label: "Reports", disabled: true, icon: <IconShield /> },
 ];
 
@@ -33,6 +36,7 @@ export default function ProductSponsorDashboard() {
   const orgs = useOrganizations(token);
   const proposals = useProposals(token);
   const structures = useStructures(token);
+  const investmentNotes = useInvestmentNotes(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -43,7 +47,7 @@ export default function ProductSponsorDashboard() {
   const [targetSizeNGN, setTargetSizeNGN] = useState("");
   const [tenorMonths, setTenorMonths] = useState("");
 
-  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error;
+  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error ?? investmentNotes.error;
 
   const issuingHouses = orgs.data.filter((o) => o.role === "IssuingHouse" && o.active);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -283,6 +287,40 @@ export default function ProductSponsorDashboard() {
             keyExtractor={(s) => s.contractId}
             emptyTitle="Nothing in structuring yet"
             emptyDescription="Once an Issuing House structures one of your proposals, it will show up here."
+          />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconLayers /> Issued notes ({investmentNotes.data.length})
+            </span>
+          }
+          description="Your products that have been approved by the SEC and issued as live Investment Notes."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (n: InvestmentNote) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{n.productName}</span>
+                    <span className={styles.productMeta}>{n.symbol}</span>
+                  </div>
+                ),
+              },
+              { key: "type", header: "Structure type", render: (n: InvestmentNote) => <StatusBadge tone="outline">{n.structureType}</StatusBadge> },
+              { key: "supply", header: "Total supply", mono: true, render: (n: InvestmentNote) => n.totalSupply.toLocaleString() },
+              { key: "reference", header: "Approval reference", mono: true, render: (n: InvestmentNote) => n.approvalReference },
+            ]}
+            rows={investmentNotes.data}
+            keyExtractor={(n) => n.contractId}
+            emptyTitle="Nothing issued yet"
+            emptyDescription="Once your product completes SEC approval and issuance, it will show up here."
           />
         </CardBody>
       </Card>

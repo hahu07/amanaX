@@ -6,16 +6,19 @@ import { DataTable, type DataTableColumn } from "../../components/DataTable";
 import { StatusBadge } from "../../components/StatusBadge";
 import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
-import { IconClipboardCheck, IconFileText, IconShield } from "../../components/icons";
+import { IconClipboardCheck, IconFileText, IconLayers, IconShield } from "../../components/icons";
 import { useAuth } from "../../auth/AuthContext";
 import { useOrganizations } from "../../hooks/useOrganizations";
 import { useRegulatorySubmissions } from "../../hooks/useRegulatorySubmissions";
+import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import type { RegulatorySubmissionItem } from "../../api/regulatoryApi";
+import type { InvestmentNote } from "../../api/investmentNotesApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./SecDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Filings", active: true, icon: <IconFileText /> },
+  { label: "Notes", active: true, icon: <IconLayers /> },
   { label: "Reports", disabled: true, icon: <IconShield /> },
 ];
 
@@ -25,6 +28,7 @@ export default function SecDashboard() {
 
   const orgs = useOrganizations(token);
   const submissions = useRegulatorySubmissions(token);
+  const investmentNotes = useInvestmentNotes(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -61,7 +65,7 @@ export default function SecDashboard() {
     }
   }
 
-  const error = actionError ?? orgs.error ?? submissions.error;
+  const error = actionError ?? orgs.error ?? submissions.error ?? investmentNotes.error;
   const pending = submissions.data.filter((s) => s.status === "Pending");
   const approved = submissions.data.filter((s) => s.status === "Approved");
 
@@ -229,6 +233,40 @@ export default function SecDashboard() {
             keyExtractor={(s) => s.contractId}
             emptyTitle="Nothing approved yet"
             emptyDescription="Approved filings will appear here."
+          />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconLayers /> Issued notes ({investmentNotes.data.length})
+            </span>
+          }
+          description="Investment Notes issued against your approvals, with their Token Standard instrument identifier."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (n: InvestmentNote) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{n.productName}</span>
+                    <span className={styles.productMeta}>{orgName(n.issuingHouse)}</span>
+                  </div>
+                ),
+              },
+              { key: "symbol", header: "Symbol", mono: true, render: (n: InvestmentNote) => n.symbol },
+              { key: "supply", header: "Total supply", mono: true, render: (n: InvestmentNote) => n.totalSupply.toLocaleString() },
+              { key: "reference", header: "Approval reference", mono: true, render: (n: InvestmentNote) => n.approvalReference },
+            ]}
+            rows={investmentNotes.data}
+            keyExtractor={(n) => n.contractId}
+            emptyTitle="No notes issued yet"
+            emptyDescription="Issued notes will appear here once an Issuing House completes issuance."
           />
         </CardBody>
       </Card>

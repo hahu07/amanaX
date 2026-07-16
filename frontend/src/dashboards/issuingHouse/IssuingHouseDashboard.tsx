@@ -14,9 +14,11 @@ import { useStructures } from "../../hooks/useStructures";
 import { useShariahReviews } from "../../hooks/useShariahReviews";
 import { useTrusteeReviews } from "../../hooks/useTrusteeReviews";
 import { useRegulatorySubmissions } from "../../hooks/useRegulatorySubmissions";
+import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType, type StructuringRecommendation } from "../../api/productsApi";
 import type { ComplianceAssessment, ShariahReviewItem, TrusteeReviewItem } from "../../api/reviewsApi";
 import type { FilingDocument, RegulatorySubmissionItem } from "../../api/regulatoryApi";
+import type { InvestmentNote } from "../../api/investmentNotesApi";
 import { ApiError } from "../../api/backendClient";
 import { formatNGN } from "../../lib/format";
 import styles from "./IssuingHouseDashboard.module.css";
@@ -26,6 +28,7 @@ const NAV_ITEMS = [
   { label: "Structures", active: true, icon: <IconLayers /> },
   { label: "Reviews", active: true, icon: <IconClipboardCheck /> },
   { label: "Filings", active: true, icon: <IconShield /> },
+  { label: "Notes", active: true, icon: <IconLayers /> },
   { label: "Reports", disabled: true, icon: <IconFileText /> },
 ];
 
@@ -57,6 +60,7 @@ export default function IssuingHouseDashboard() {
   const shariahReviews = useShariahReviews(token);
   const trusteeReviews = useTrusteeReviews(token);
   const regulatorySubmissions = useRegulatorySubmissions(token);
+  const investmentNotes = useInvestmentNotes(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -301,6 +305,29 @@ export default function IssuingHouseDashboard() {
     }
   }
 
+  // --- Step 10: issue the Investment Note once the SEC has approved ---
+  const [issuingFor, setIssuingFor] = useState<string | null>(null);
+  const [symbol, setSymbol] = useState("");
+  const [parValueNGN, setParValueNGN] = useState("");
+
+  function openIssue(submission: RegulatorySubmissionItem) {
+    setActionError(null);
+    setIssuingFor(issuingFor === submission.contractId ? null : submission.contractId);
+    setSymbol("");
+    setParValueNGN("");
+  }
+
+  async function handleIssue(e: FormEvent, submission: RegulatorySubmissionItem) {
+    e.preventDefault();
+    setActionError(null);
+    try {
+      await investmentNotes.issue(submission.contractId, { symbol, parValueNGN: Number(parValueNGN) });
+      setIssuingFor(null);
+    } catch {
+      setActionError("Could not issue the Investment Note — check the symbol isn't already in use.");
+    }
+  }
+
   const error =
     actionError ??
     orgs.error ??
@@ -308,7 +335,8 @@ export default function IssuingHouseDashboard() {
     structures.error ??
     shariahReviews.error ??
     trusteeReviews.error ??
-    regulatorySubmissions.error;
+    regulatorySubmissions.error ??
+    investmentNotes.error;
   const draftStructures = structures.data.filter((s) => s.status === "ProductStructure_Draft");
   const finalizedStructures = structures.data.filter((s) => s.status === "ProductStructure_Finalized");
   const pendingShariahReviews = shariahReviews.data.filter((r) => r.status === "Pending");
@@ -955,18 +983,103 @@ export default function IssuingHouseDashboard() {
                 key: "actions",
                 header: "",
                 align: "right",
-                render: (s: RegulatorySubmissionItem) =>
-                  s.status === "Pending" ? (
-                    <Button size="sm" variant="danger" onClick={() => handleWithdrawSubmission(s)}>
-                      Withdraw
+                render: (s: RegulatorySubmissionItem) => {
+                  if (s.status === "Pending") {
+                    return (
+                      <Button size="sm" variant="danger" onClick={() => handleWithdrawSubmission(s)}>
+                        Withdraw
+                      </Button>
+                    );
+                  }
+                  const alreadyIssued = investmentNotes.data.some((n) => n.approvalCid === s.contractId);
+                  if (alreadyIssued) {
+                    return <StatusBadge tone="outline">Issued</StatusBadge>;
+                  }
+                  return (
+                    <Button size="sm" variant={issuingFor === s.contractId ? "secondary" : "primary"} onClick={() => openIssue(s)}>
+                      {issuingFor === s.contractId ? "Close" : "Issue note"}
                     </Button>
-                  ) : null,
+                  );
+                },
               },
             ]}
             rows={regulatorySubmissions.data}
             keyExtractor={(s) => s.contractId}
             emptyTitle="No regulatory submissions yet"
             emptyDescription="Submit to the SEC above to see it here."
+          />
+        </CardBody>
+        {issuingFor &&
+          (() => {
+            const submission = regulatorySubmissions.data.find((s) => s.contractId === issuingFor);
+            if (!submission) return null;
+            return (
+              <div className={styles.reviewPanel}>
+                <form className={styles.form} onSubmit={(e) => handleIssue(e, submission)}>
+                  <div className={styles.field}>
+                    <label htmlFor="symbol">Symbol</label>
+                    <input
+                      id="symbol"
+                      required
+                      value={symbol}
+                      onChange={(e) => setSymbol(e.target.value)}
+                      placeholder="e.g. AMXSNI"
+                    />
+                  </div>
+                  <div className={styles.field}>
+                    <label htmlFor="parValueNGN">Par value per unit (NGN)</label>
+                    <input
+                      id="parValueNGN"
+                      required
+                      type="number"
+                      min="1"
+                      value={parValueNGN}
+                      onChange={(e) => setParValueNGN(e.target.value)}
+                      placeholder="1000000"
+                    />
+                  </div>
+                  <div className={styles.formActions}>
+                    <Button type="submit" variant="primary">
+                      Issue Investment Note
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            );
+          })()}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconLayers /> Investment Notes ({investmentNotes.data.length})
+            </span>
+          }
+          description="Notes issued on the Canton Network, discoverable via their Token Standard instrument metadata."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (n: InvestmentNote) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{n.productName}</span>
+                    <span className={styles.productMeta}>{n.symbol}</span>
+                  </div>
+                ),
+              },
+              { key: "type", header: "Structure type", render: (n: InvestmentNote) => <StatusBadge tone="outline">{n.structureType}</StatusBadge> },
+              { key: "supply", header: "Total supply", mono: true, render: (n: InvestmentNote) => n.totalSupply.toLocaleString() },
+              { key: "parValue", header: "Par value", mono: true, render: (n: InvestmentNote) => formatNGN(n.parValueNGN) },
+              { key: "reference", header: "Approval reference", mono: true, render: (n: InvestmentNote) => n.approvalReference },
+            ]}
+            rows={investmentNotes.data}
+            keyExtractor={(n) => n.contractId}
+            emptyTitle="No notes issued yet"
+            emptyDescription="Issue an approved filing above to see it here."
           />
         </CardBody>
       </Card>

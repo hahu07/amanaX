@@ -104,6 +104,12 @@ export async function submitToSEC(params: {
   return toSubmission(contractId, createArgument, "Pending");
 }
 
+export async function findApprovalById(party: string, contractId: string): Promise<RegulatorySubmissionItem | undefined> {
+  const contracts = await queryActiveContracts({ party, templateFilterId: APPROVAL_TEMPLATE_ID });
+  const approvals = contracts.map((c) => toSubmission(c.contractId, c.createArgument, "Approved"));
+  return approvals.find((a) => a.contractId === contractId);
+}
+
 export async function listSubmissions(party: string): Promise<RegulatorySubmissionItem[]> {
   const [pending, approved] = await Promise.all([
     queryActiveContracts({ party, templateFilterId: SUBMISSION_TEMPLATE_ID }),

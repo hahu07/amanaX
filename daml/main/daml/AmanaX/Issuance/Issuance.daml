@@ -1,0 +1,81 @@
+module AmanaX.Issuance.Issuance where
+
+import DA.TextMap qualified as TextMap
+import AmanaX.Product.Types (ProductType)
+import AmanaX.Regulatory.Regulatory (SECApproval)
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+import Splice.Api.Token.MetadataV1 (Metadata(..))
+
+-- | Step 10 (docs/prompt.md): once the SEC has approved, the Issuing House
+-- issues the Investment Note. This is a plain `createCmd` from the backend,
+-- not a choice on `SECApproval` — same trade-off already made and
+-- documented for Step 1 in AmanaX.Product.ProductStructure ("structure
+-- must be Finalized" is backend-enforced, not ledger-enforced): a choice
+-- returning `ContractId InvestmentNote` would have to live on the
+-- `SECApproval` template in Regulatory.daml, which would force
+-- Regulatory.daml to import this module — circular, since InvestmentNote
+-- already needs `ContractId SECApproval` as a field. The backend route
+-- verifies the referenced SECApproval is active and belongs to the caller
+-- before creating this contract (see backend/src/ledger/issuance.ts).
+--
+-- `instrumentId` and `meta` adopt the CIP-0056 Token Standard's data
+-- model from the vendored `splice-api-token-holding-v1` /
+-- `splice-api-token-metadata-v1` packages. Note that neither vendored
+-- package defines a `TokenMetadata` *interface* with name/symbol/
+-- totalSupply fields to `instance`-implement — `MetadataV1` only supplies
+-- generic plumbing types (`Metadata`, `AnyValue`), and the per-instrument
+-- identity concept is `InstrumentId` (from `HoldingV1`), attached to
+-- `Holding`s once they exist. Milestone 6 implements `Holding` (via
+-- `Allocation`) referencing this note's `instrumentId`; this milestone's
+-- job is to establish that `InstrumentId` and record the note's
+-- descriptive facts as `Metadata` using the k8s-style well-known-key
+-- convention `MetadataV1.daml` itself recommends, so the note is
+-- "discoverable via Token Metadata" ahead of any holding existing.
+template InvestmentNote
+  with
+    issuingHouse : Party
+    sec : Party
+    sponsor : Party
+    trustee : Party
+    approvalCid : ContractId SECApproval
+    instrumentId : InstrumentId
+    symbol : Text
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    parValueNGN : Decimal
+    totalSupply : Decimal
+    meta : Metadata
+    approvalReference : Text
+    issuedAt : Time
+  where
+    signatory issuingHouse
+    observer sec, sponsor, trustee
+
+    ensure
+      parValueNGN > 0.0
+        && targetSizeNGN > 0.0
+        && totalSupply > 0.0
+        && symbol /= ""
+        && instrumentId.id == symbol
+        && instrumentId.admin == issuingHouse
+
+-- | Builds the note's well-known-key `Metadata` — pulled out as a plain
+-- function (not inlined at every call site) so the backend's Daml Script
+-- tests and the real creation path can't drift on which keys are set.
+investmentNoteMetadata : Text -> Text -> ProductType -> Decimal -> Decimal -> Int -> Metadata
+investmentNoteMetadata productName symbol structureType totalSupply parValueNGN tenorMonths =
+  Metadata with
+    values = TextMap.fromList
+      [ ("amanax.io/name", productName)
+      , ("amanax.io/symbol", symbol)
+      , ("amanax.io/structureType", show structureType)
+      , ("amanax.io/totalSupply", show totalSupply)
+      , ("amanax.io/parValueNGN", show parValueNGN)
+      , ("amanax.io/tenorMonths", show tenorMonths)
+      ]

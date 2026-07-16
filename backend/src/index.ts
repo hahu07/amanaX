@@ -8,6 +8,7 @@ import { proposalsRouter } from "./api/proposals.js";
 import { structuresRouter } from "./api/structures.js";
 import { reviewsRouter } from "./api/reviews.js";
 import { regulatoryRouter } from "./api/regulatory.js";
+import { issuanceRouter } from "./api/issuance.js";
 
 export const app = express();
 app.use(cors());
@@ -19,6 +20,7 @@ app.use(proposalsRouter);
 app.use(structuresRouter);
 app.use(reviewsRouter);
 app.use(regulatoryRouter);
+app.use(issuanceRouter);
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(config.port, () => {

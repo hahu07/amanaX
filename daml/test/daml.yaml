@@ -10,3 +10,4 @@ build-options:
   - --target=2.1
 data-dependencies:
   - ../main/.daml/dist/amanax-main-0.0.1.dar
+  - ../../vendor/token-standard/splice-api-token-holding-v1/.daml/dist/splice-api-token-holding-v1-1.0.0.dar

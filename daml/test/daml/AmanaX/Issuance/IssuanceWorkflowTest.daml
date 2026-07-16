@@ -1,0 +1,264 @@
+module AmanaX.Issuance.IssuanceWorkflowTest where
+
+import DA.Assert ((===))
+import DA.TextMap qualified as TextMap
+import Daml.Script
+import AmanaX.Identity.Organization (OrgRole(..))
+import AmanaX.Product.Types
+import AmanaX.Product.ProductProposal
+import AmanaX.Product.ProductStructure
+import AmanaX.Review.Review
+import AmanaX.Regulatory.Regulatory
+import AmanaX.Issuance.Issuance
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+
+-- | Milestone 5 gate: an approved product becomes a live, issued
+-- Investment Note discoverable via its Token Metadata. Continues on from
+-- an SEC approval (same setup as
+-- AmanaX.Regulatory.RegulatoryWorkflowTest.regulatorySubmissionApprovalTest).
+issuanceTest : Script ()
+issuanceTest = do
+  fundManager <- allocateParty "FundManagerIssCo"
+  issuingHouse <- allocateParty "IssuingHouseIssCo"
+  shariahAdvisor <- allocateParty "ShariahAdvisorIssCo"
+  trustee <- allocateParty "TrusteeIssCo"
+  sec <- allocateParty "SECIssCo"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      proposedType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Ijarah
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      structureTenorMonths = 24
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+
+  shariahReviewCid <- submit shariahAdvisor do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "Structure conforms to Ijarah principles."
+
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "Governance and investor-protection terms are adequate."
+
+  submissionCid <- submit issuingHouse do
+    createCmd RegulatorySubmission with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      structureCid = finalizedCid
+      trusteeReviewCid
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      certificationNotes = "Structure conforms to Ijarah principles."
+      approvalNotes = "Governance and investor-protection terms are adequate."
+      documents = []
+
+  approvalCid <- submit sec do
+    exerciseCmd submissionCid RegulatorySubmission_Approve with
+      approvalReference = "SEC/AMX/2026/0001"
+
+  -- Step 10: Issuing House issues the note (plain createCmd, per this
+  -- module's design note — backend verifies the SECApproval first).
+  now <- getTime
+  let symbol = "AMXSNI"
+      parValueNGN = 1000000.0
+      totalSupply = 500000000.0 / parValueNGN
+      instrumentId = InstrumentId with admin = issuingHouse, id = symbol
+      meta = investmentNoteMetadata "AmanaX Sukuk Note I" symbol Ijarah totalSupply parValueNGN 24
+
+  noteCid <- submit issuingHouse do
+    createCmd InvestmentNote with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      approvalCid
+      instrumentId
+      symbol
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      parValueNGN
+      totalSupply
+      meta
+      approvalReference = "SEC/AMX/2026/0001"
+      issuedAt = now
+
+  -- sponsor, trustee and SEC can all see the issued note as observers —
+  -- the note is "discoverable" per the Milestone 5 gate.
+  sponsorView <- queryContractId fundManager noteCid
+  case sponsorView of
+    None -> error "expected sponsor to see the issued note"
+    Some _ -> pure ()
+  secView <- queryContractId sec noteCid
+  case secView of
+    None -> error "expected SEC to see the issued note"
+    Some _ -> pure ()
+
+  note <- queryContractId issuingHouse noteCid
+  case note of
+    None -> error "expected InvestmentNote to exist"
+    Some n -> do
+      n.instrumentId === InstrumentId with admin = issuingHouse, id = "AMXSNI"
+      n.totalSupply === 500.0
+      TextMap.lookup "amanax.io/symbol" n.meta.values === Some "AMXSNI"
+      TextMap.lookup "amanax.io/totalSupply" n.meta.values === Some "500.0"
+      TextMap.lookup "amanax.io/name" n.meta.values === Some "AmanaX Sukuk Note I"
+
+  pure ()
+
+-- | An InvestmentNote's `ensure` clause rejects a mismatched
+-- instrumentId (wrong admin, or an id that doesn't match the declared
+-- symbol) — the Daml-level half of the "InstrumentId must be unique and
+-- unambiguous per instrument admin" contract from HoldingV1.daml's own
+-- doc comment; uniqueness itself is a backend-level check (no contract
+-- keys under LF 2.1 — see AmanaX.Issuance.Issuance's module comment).
+mismatchedInstrumentIdRejectedTest : Script ()
+mismatchedInstrumentIdRejectedTest = do
+  issuingHouse <- allocateParty "IssuingHouseIssCo2"
+  otherParty <- allocateParty "OtherPartyIssCo2"
+  sec <- allocateParty "SECIssCo2"
+  fundManager <- allocateParty "FundManagerIssCo2"
+  trustee <- allocateParty "TrusteeIssCo2"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "Mismatch Note"
+      description = "Should fail InvestmentNote's ensure clause."
+      proposedType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Murabahah
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+      structureTenorMonths = 6
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor = trustee
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "Mismatch Note"
+      description = "Should fail InvestmentNote's ensure clause."
+      structureType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+
+  shariahReviewCid <- submit trustee do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "OK."
+
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "OK."
+
+  submissionCid <- submit issuingHouse do
+    createCmd RegulatorySubmission with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      structureCid = finalizedCid
+      trusteeReviewCid
+      productName = "Mismatch Note"
+      description = "Should fail InvestmentNote's ensure clause."
+      structureType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+      certificationNotes = "OK."
+      approvalNotes = "OK."
+      documents = []
+
+  approvalCid <- submit sec do
+    exerciseCmd submissionCid RegulatorySubmission_Approve with
+      approvalReference = "SEC/AMX/2026/0002"
+
+  now <- getTime
+  submitMustFail issuingHouse do
+    createCmd InvestmentNote with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      approvalCid
+      instrumentId = InstrumentId with admin = otherParty, id = "BAD"
+      symbol = "BAD"
+      productName = "Mismatch Note"
+      description = "Should fail InvestmentNote's ensure clause."
+      structureType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+      parValueNGN = 1000.0
+      totalSupply = 100.0
+      meta = investmentNoteMetadata "Mismatch Note" "BAD" Murabahah 100.0 1000.0 6
+      approvalReference = "SEC/AMX/2026/0002"
+      issuedAt = now

@@ -267,7 +267,7 @@ All open questions from the previous revision of this plan are resolved as of 20
 | Agents service language | TypeScript (LangGraph.js) | §3.2 `agents/`, stack-consistent with backend/frontend |
 | Party model | One Daml party per organization (+ SEC, + Platform Operator) | §3.3 |
 | Investor custody | Platform-managed party for MVP; self-custody is an explicit fast-follow, out of scope for Milestones 0-9 | §3.3 |
-| Token Standard (CIP-0056) | **In scope for the MVP**, not deferred — `InvestmentNote` implements Token Metadata, `Allocation` implements Holding + Allocation/Allocation Instruction, unit movement via Transfer Instruction | §2, §3.5 table, Milestones 5-6 |
+| Token Standard (CIP-0056) | **In scope for the MVP**, not deferred — `InvestmentNote` adopts the Token Standard's `InstrumentId` + `Metadata` data model (see [milestone-5.md](milestones/milestone-5.md) Findings — the vendored `splice-api-token-metadata-v1` package has no separate "Token Metadata" *interface* to `instance`-implement; metadata is carried via `HoldingV1.InstrumentId` + `MetadataV1.Metadata`, well-known-keyed), `Allocation` implements Holding + Allocation/Allocation Instruction, unit movement via Transfer Instruction | §2, §3.5 table, Milestones 5-6 |
 | Production hosting | Node-as-a-Service (NaaS) provider, not self-hosted validator | §3.6, Milestone 9 |
 | Currency | NGN only for MVP; Daml `Decimal` (10dp) internally, 2dp display formatting in frontend | §3.6, Milestone 7 |
 
