@@ -4,6 +4,7 @@ import { requireAuth, requireOrgParty, requireRole } from "../auth/middleware.js
 import { findApprovedTrusteeReviewById } from "../ledger/reviews.js";
 import { approveSubmission, listSubmissions, rejectSubmission, submitToSEC, withdrawSubmission } from "../ledger/regulatory.js";
 import { invokeIssuingHouseAssistant, type DealContext } from "../agents/client.js";
+import { logAuditEvent } from "../ledger/auditLog.js";
 
 export const regulatoryRouter = Router();
 
@@ -52,6 +53,13 @@ regulatoryRouter.post("/trustee-reviews/:contractId/generate-filing-pack", requi
     intent: "generate-documents",
     context: buildDealContext(req.params.contractId, trusteeReview),
   });
+  await logAuditEvent({
+    actor: issuingHouse,
+    kind: "DocumentGenerated",
+    agent: "documentation",
+    summary: `Filing pack previewed for ${trusteeReview.productName}`,
+    dealId: req.params.contractId,
+  });
   res.status(200).json(response);
 });
 
@@ -85,6 +93,13 @@ regulatoryRouter.post("/trustee-reviews/:contractId/submit-to-sec", requireRole(
     context,
   });
   const compliance = complianceRes.output as ComplianceAssessment;
+  await logAuditEvent({
+    actor: issuingHouse,
+    kind: "ComplianceCheckPerformed",
+    agent: "compliance",
+    summary: `Compliance re-checked at SEC submission for ${trusteeReview.productName} — readyForSubmission: ${compliance.readyForSubmission}`,
+    dealId: req.params.contractId,
+  });
   if (!compliance.readyForSubmission) {
     res.status(409).json({ error: "not ready for SEC submission", compliance });
     return;

@@ -1,0 +1,38 @@
+module AmanaX.Audit.AuditLog where
+
+-- | docs/implementation_plan.md §1 decision: "the ledger already gives
+-- immutable history per contract; a redundant AuditLog template needs a
+-- clear job. Use AuditLog only for off-ledger events (AI recommendations
+-- shown/dismissed, document generation, notification sends) that the
+-- ledger wouldn't otherwise capture; on-ledger state changes are audited
+-- via the transaction stream / PQS, not duplicated into AuditLog." This
+-- is that template, finally implemented in Milestone 8 alongside the
+-- Reporting Agent that gives it its first real readers.
+data AuditEventKind
+  = StructuringRecommendationShown
+  | ComplianceCheckPerformed
+  | DocumentGenerated
+  | RiskAssessmentPerformed
+  | ReportGenerated
+  deriving (Eq, Show)
+
+-- | Signatory operator (the platform, recording that *some* off-ledger
+-- AI event happened) — same "backend acts with the Operator's authority"
+-- reasoning as every off-ledger-triggered write in this codebase.
+-- `actor` (whichever org/investor party triggered the event) is an
+-- observer, so they can see their own audit trail without the operator
+-- having to build a separate query surface for it.
+template AuditLog
+  with
+    operator : Party
+    actor : Party
+    kind : AuditEventKind
+    agent : Text
+    summary : Text
+    dealId : Text
+    occurredAt : Time
+  where
+    signatory operator
+    observer actor
+
+    ensure agent /= "" && summary /= ""

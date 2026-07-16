@@ -21,6 +21,7 @@ import { investorSignupRouter } from "./api/investorSignup.js";
 import { investorsRouter } from "./api/investors.js";
 import { subscriptionsRouter } from "./api/subscriptions.js";
 import { distributionsRouter } from "./api/distributions.js";
+import { reportsRouter } from "./api/reports.js";
 
 export const app = express();
 app.use(cors());
@@ -43,6 +44,7 @@ app.use(issuanceRouter);
 app.use(investorsRouter);
 app.use(subscriptionsRouter);
 app.use(distributionsRouter);
+app.use(reportsRouter);
 
 // Catch-all: turns any error `express-async-errors` routes here (ledger
 // failures, programming errors) into a 500 instead of a process crash.

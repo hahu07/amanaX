@@ -1,0 +1,68 @@
+module AmanaX.Compliance.ComplianceReportTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Compliance.ComplianceReport
+
+-- | Milestone 8: a persisted compliance snapshot, visible to Trustee and
+-- sponsor as observers.
+complianceReportTest : Script ()
+complianceReportTest = do
+  issuingHouse <- allocateParty "IssuingHouseComp"
+  trustee <- allocateParty "TrusteeComp"
+  sponsor <- allocateParty "SponsorComp"
+
+  now <- getTime
+  reportCid <- submit issuingHouse do
+    createCmd ComplianceReport with
+      issuingHouse
+      trustee
+      sponsor
+      dealId = "deal-comp-1"
+      productName = "Compliance Test Note"
+      readyForSubmission = True
+      workflowGaps = []
+      shariahChecklistGaps = []
+      missingDocuments = ["Trust Deed"]
+      generatedAt = now
+
+  trusteeView <- queryContractId trustee reportCid
+  case trusteeView of
+    None -> error "expected trustee to see the report"
+    Some _ -> pure ()
+  sponsorView <- queryContractId sponsor reportCid
+  case sponsorView of
+    None -> error "expected sponsor to see the report"
+    Some _ -> pure ()
+
+  report <- queryContractId issuingHouse reportCid
+  case report of
+    None -> error "expected report to exist"
+    Some r -> do
+      r.readyForSubmission === True
+      r.missingDocuments === ["Trust Deed"]
+
+-- | An unrelated party has no visibility into the report at all.
+onlyStakeholdersCanSeeReportTest : Script ()
+onlyStakeholdersCanSeeReportTest = do
+  issuingHouse <- allocateParty "IssuingHouseComp2"
+  trustee <- allocateParty "TrusteeComp2"
+  sponsor <- allocateParty "SponsorComp2"
+  outsider <- allocateParty "OutsiderComp2"
+
+  now <- getTime
+  reportCid <- submit issuingHouse do
+    createCmd ComplianceReport with
+      issuingHouse
+      trustee
+      sponsor
+      dealId = "deal-comp-2"
+      productName = "Compliance Test Note 2"
+      readyForSubmission = False
+      workflowGaps = ["Trustee review not yet completed."]
+      shariahChecklistGaps = []
+      missingDocuments = []
+      generatedAt = now
+
+  outsiderView <- queryContractId outsider reportCid
+  outsiderView === None

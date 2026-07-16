@@ -13,13 +13,14 @@ import { useRegulatorySubmissions } from "../../hooks/useRegulatorySubmissions";
 import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import type { RegulatorySubmissionItem } from "../../api/regulatoryApi";
 import type { InvestmentNote } from "../../api/investmentNotesApi";
+import { getRegulatoryReport, type GeneratedReport } from "../../api/reportsApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./SecDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Filings", active: true, icon: <IconFileText /> },
   { label: "Notes", active: true, icon: <IconLayers /> },
-  { label: "Reports", disabled: true, icon: <IconShield /> },
+  { label: "Reports", active: true, icon: <IconShield /> },
 ];
 
 export default function SecDashboard() {
@@ -62,6 +63,29 @@ export default function SecDashboard() {
       setOpenId(null);
     } catch {
       setActionError("Could not reject this submission.");
+    }
+  }
+
+  const [reportFor, setReportFor] = useState<string | null>(null);
+  const [report, setReport] = useState<GeneratedReport | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+
+  async function handleGenerateReport(note: InvestmentNote) {
+    setActionError(null);
+    if (reportFor === note.contractId) {
+      setReportFor(null);
+      return;
+    }
+    setReportFor(note.contractId);
+    setReport(null);
+    setReportLoading(true);
+    try {
+      const res = await getRegulatoryReport(token, note.contractId);
+      setReport(res.output);
+    } catch {
+      setActionError("Could not reach the Reporting Agent.");
+    } finally {
+      setReportLoading(false);
     }
   }
 
@@ -262,6 +286,16 @@ export default function SecDashboard() {
               { key: "symbol", header: "Symbol", mono: true, render: (n: InvestmentNote) => n.symbol },
               { key: "supply", header: "Total supply", mono: true, render: (n: InvestmentNote) => n.totalSupply.toLocaleString() },
               { key: "reference", header: "Approval reference", mono: true, render: (n: InvestmentNote) => n.approvalReference },
+              {
+                key: "actions",
+                header: "",
+                align: "right",
+                render: (n: InvestmentNote) => (
+                  <Button size="sm" variant={reportFor === n.contractId ? "secondary" : "primary"} onClick={() => handleGenerateReport(n)}>
+                    {reportFor === n.contractId ? "Close" : "Report"}
+                  </Button>
+                ),
+              },
             ]}
             rows={investmentNotes.data}
             keyExtractor={(n) => n.contractId}
@@ -269,6 +303,19 @@ export default function SecDashboard() {
             emptyDescription="Issued notes will appear here once an Issuing House completes issuance."
           />
         </CardBody>
+        {reportFor && (
+          <div className={styles.reviewPanel}>
+            {reportLoading && <p>Consulting the Reporting Agent…</p>}
+            {report && (
+              <div className={styles.documentsList}>
+                <details className={styles.documentItem} open>
+                  <summary>{report.title}</summary>
+                  <pre className={styles.documentMarkdown}>{report.markdown}</pre>
+                </details>
+              </div>
+            )}
+          </div>
+        )}
       </Card>
     </AppShell>
   );

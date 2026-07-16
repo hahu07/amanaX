@@ -84,6 +84,44 @@ export const RiskAssessmentSchema = z.object({
 });
 export type RiskAssessment = z.infer<typeof RiskAssessmentSchema>;
 
+// Milestone 8 — Reporting Agent. docs/prompt.md: "Generates: management
+// reports, investor reports, compliance reports, regulatory reports."
+// One flexible context shape covers all four — `holdings`/`distributions`
+// are reused as "this deal's subscriptions/distributions" for
+// management/regulatory reports and as "this investor's own holdings/
+// distributions across every note" for investor reports; the per-deal
+// fields (productName, symbol, ...) are simply absent for the
+// portfolio-wide investor report. Same "backend assembles context, agent
+// never touches the ledger" pattern as DealContext.
+export const ReportTypeSchema = z.enum(["management", "investor", "compliance", "regulatory"]);
+export type ReportType = z.infer<typeof ReportTypeSchema>;
+
+export const ReportContextSchema = z.object({
+  reportType: ReportTypeSchema,
+  dealId: z.string(),
+  generatedFor: z.string().optional(),
+  productName: z.string().optional(),
+  symbol: z.string().optional(),
+  structureType: z.string().optional(),
+  targetSizeNGN: z.number().optional(),
+  totalSupply: z.number().optional(),
+  approvalReference: z.string().optional(),
+  certificationNotes: z.string().optional(),
+  approvalNotes: z.string().optional(),
+  compliance: ComplianceAssessmentSchema.nullable().optional(),
+  holdings: z.array(z.record(z.unknown())).default([]),
+  distributions: z.array(z.record(z.unknown())).default([]),
+});
+export type ReportContext = z.infer<typeof ReportContextSchema>;
+
+export const GeneratedReportSchema = z.object({
+  reportType: ReportTypeSchema,
+  title: z.string(),
+  markdown: z.string(),
+  sourceFacts: z.array(z.string()),
+});
+export type GeneratedReport = z.infer<typeof GeneratedReportSchema>;
+
 // §6.4 — backend <-> agents service contract
 export const InvokeRequestSchema = z.object({
   dealId: z.string(),

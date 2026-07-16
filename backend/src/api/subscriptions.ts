@@ -14,6 +14,7 @@ import {
   withdrawSubscription,
 } from "../ledger/subscriptions.js";
 import { invokeRiskAgent } from "../agents/client.js";
+import { logAuditEvent } from "../ledger/auditLog.js";
 
 export const subscriptionsRouter = Router();
 
@@ -100,6 +101,13 @@ subscriptionsRouter.post("/subscriptions/:contractId/risk-check", requireRole("D
     minSubscriptionNGN: subscription.minSubscriptionNGN,
     requestedAmountNGN: subscription.amountNGN,
     alreadyAllocatedNGN,
+  });
+  await logAuditEvent({
+    actor: distributor,
+    kind: "RiskAssessmentPerformed",
+    agent: "risk",
+    summary: `Risk assessment performed for ${subscription.productName} subscription (${subscription.amountNGN})`,
+    dealId: req.params.contractId,
   });
   res.status(200).json(response);
 });

@@ -1,0 +1,39 @@
+module AmanaX.Compliance.ComplianceReport where
+
+-- | Step 15 / docs/prompt.md's `ComplianceReport` template: a persisted
+-- snapshot of a Compliance Agent assessment, distinct from the ephemeral
+-- preview the Issuing House already gets from
+-- POST /trustee-reviews/:id/compliance-check (Milestone 3) — that preview
+-- is never stored, so there was no durable audit record of "what the
+-- compliance state was, and when." This template is that record: the
+-- Issuing House formally captures a fresh assessment on-ledger (a plain
+-- `createCmd`, same reasoning as InvestmentNote — see that module's
+-- comment).
+--
+-- Generated at the Trustee-review stage (Step 7-8), before SEC
+-- submission — no `InstrumentId` exists yet (that's an Issuance-only
+-- concept, Milestone 5) and no specific SEC org has been chosen yet
+-- either (that only happens at submission time, Milestone 4). `dealId`
+-- is a plain Text reference (the TrusteeReview's own contract id) rather
+-- than a typed `ContractId`, matching AuditLog's own `dealId : Text` —
+-- this snapshot is never fetched or exercised against, only displayed.
+--
+-- Signatory issuingHouse only — this is a record of what the Issuing
+-- House checked and when, not a multi-party attestation. Trustee and the
+-- sponsor are observers so they can see the compliance history for a
+-- deal without needing to re-run the check themselves.
+template ComplianceReport
+  with
+    issuingHouse : Party
+    trustee : Party
+    sponsor : Party
+    dealId : Text
+    productName : Text
+    readyForSubmission : Bool
+    workflowGaps : [Text]
+    shariahChecklistGaps : [Text]
+    missingDocuments : [Text]
+    generatedAt : Time
+  where
+    signatory issuingHouse
+    observer trustee, sponsor

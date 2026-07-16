@@ -1,7 +1,8 @@
 import express from "express";
-import { AllocationRiskContextSchema, InvokeRequestSchema } from "./types.js";
+import { AllocationRiskContextSchema, InvokeRequestSchema, ReportContextSchema } from "./types.js";
 import { invokeIssuingHouseAssistant } from "./graph/issuingHouseAssistant.js";
 import { runRiskAgent } from "./risk/agent.js";
+import { runReportingAgent } from "./reporting/agent.js";
 
 export const app = express();
 app.use(express.json());
@@ -30,6 +31,20 @@ app.post("/internal/risk/assess", async (req, res) => {
   }
   const output = await runRiskAgent(parsed.data);
   res.status(200).json({ agent: "risk", output, model: "rule-based-v1", timestamp: new Date().toISOString() });
+});
+
+// Milestone 8 — Reporting Agent, called by multiple different personas
+// (Issuing House, Investor, SEC, Trustee) for four different report
+// kinds — not the Issuing House Assistant graph, same reasoning as the
+// Risk Agent's dedicated route above.
+app.post("/internal/reports/generate", async (req, res) => {
+  const parsed = ReportContextSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.flatten() });
+    return;
+  }
+  const output = await runReportingAgent(parsed.data);
+  res.status(200).json({ agent: "reporting", output, model: "rule-based-v1", timestamp: new Date().toISOString() });
 });
 
 app.get("/health", (_req, res) => {

@@ -15,10 +15,12 @@ import { useShariahReviews } from "../../hooks/useShariahReviews";
 import { useTrusteeReviews } from "../../hooks/useTrusteeReviews";
 import { useRegulatorySubmissions } from "../../hooks/useRegulatorySubmissions";
 import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
+import { useComplianceReports } from "../../hooks/useComplianceReports";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType, type StructuringRecommendation } from "../../api/productsApi";
 import type { ComplianceAssessment, ShariahReviewItem, TrusteeReviewItem } from "../../api/reviewsApi";
 import type { FilingDocument, RegulatorySubmissionItem } from "../../api/regulatoryApi";
 import type { InvestmentNote } from "../../api/investmentNotesApi";
+import { generateComplianceReport, getManagementReport, type ComplianceReportItem, type GeneratedReport } from "../../api/reportsApi";
 import { ApiError } from "../../api/backendClient";
 import { formatNGN } from "../../lib/format";
 import styles from "./IssuingHouseDashboard.module.css";
@@ -29,7 +31,7 @@ const NAV_ITEMS = [
   { label: "Reviews", active: true, icon: <IconClipboardCheck /> },
   { label: "Filings", active: true, icon: <IconShield /> },
   { label: "Notes", active: true, icon: <IconLayers /> },
-  { label: "Reports", disabled: true, icon: <IconFileText /> },
+  { label: "Reports", active: true, icon: <IconFileText /> },
 ];
 
 interface StructureFormState {
@@ -61,6 +63,7 @@ export default function IssuingHouseDashboard() {
   const trusteeReviews = useTrusteeReviews(token);
   const regulatorySubmissions = useRegulatorySubmissions(token);
   const investmentNotes = useInvestmentNotes(token);
+  const complianceReports = useComplianceReports(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -328,6 +331,47 @@ export default function IssuingHouseDashboard() {
     }
   }
 
+  // --- Milestone 8: compliance report (persisted) + management report ---
+  const [complianceReportLoading, setComplianceReportLoading] = useState(false);
+  const [complianceReportDoc, setComplianceReportDoc] = useState<GeneratedReport | null>(null);
+
+  async function handleGenerateComplianceReport(review: TrusteeReviewItem) {
+    setActionError(null);
+    setComplianceReportLoading(true);
+    try {
+      const res = await generateComplianceReport(token, review.contractId);
+      setComplianceReportDoc(res.document);
+      await complianceReports.refresh();
+    } catch {
+      setActionError("Could not persist the compliance report.");
+    } finally {
+      setComplianceReportLoading(false);
+    }
+  }
+
+  const [managementReportFor, setManagementReportFor] = useState<string | null>(null);
+  const [managementReport, setManagementReport] = useState<GeneratedReport | null>(null);
+  const [managementReportLoading, setManagementReportLoading] = useState(false);
+
+  async function handleGenerateManagementReport(note: InvestmentNote) {
+    setActionError(null);
+    if (managementReportFor === note.contractId) {
+      setManagementReportFor(null);
+      return;
+    }
+    setManagementReportFor(note.contractId);
+    setManagementReport(null);
+    setManagementReportLoading(true);
+    try {
+      const res = await getManagementReport(token, note.contractId);
+      setManagementReport(res.output);
+    } catch {
+      setActionError("Could not reach the Reporting Agent.");
+    } finally {
+      setManagementReportLoading(false);
+    }
+  }
+
   const error =
     actionError ??
     orgs.error ??
@@ -336,7 +380,8 @@ export default function IssuingHouseDashboard() {
     shariahReviews.error ??
     trusteeReviews.error ??
     regulatorySubmissions.error ??
-    investmentNotes.error;
+    investmentNotes.error ??
+    complianceReports.error;
   const draftStructures = structures.data.filter((s) => s.status === "ProductStructure_Draft");
   const finalizedStructures = structures.data.filter((s) => s.status === "ProductStructure_Finalized");
   const pendingShariahReviews = shariahReviews.data.filter((r) => r.status === "Pending");
@@ -897,6 +942,22 @@ export default function IssuingHouseDashboard() {
                   )}
                 </div>
 
+                {compliance && (
+                  <div className={styles.formActions}>
+                    <Button size="sm" variant="secondary" onClick={() => handleGenerateComplianceReport(review)} disabled={complianceReportLoading}>
+                      {complianceReportLoading ? "Saving…" : "Generate compliance report"}
+                    </Button>
+                  </div>
+                )}
+                {complianceReportDoc && (
+                  <div className={styles.documentsList}>
+                    <details className={styles.documentItem}>
+                      <summary>{complianceReportDoc.title}</summary>
+                      <pre className={styles.documentMarkdown}>{complianceReportDoc.markdown}</pre>
+                    </details>
+                  </div>
+                )}
+
                 {compliance?.readyForSubmission && (
                   <>
                     <Button size="sm" variant="secondary" onClick={() => handleGenerateFilingPack(review)}>
@@ -1075,11 +1136,73 @@ export default function IssuingHouseDashboard() {
               { key: "supply", header: "Total supply", mono: true, render: (n: InvestmentNote) => n.totalSupply.toLocaleString() },
               { key: "parValue", header: "Par value", mono: true, render: (n: InvestmentNote) => formatNGN(n.parValueNGN) },
               { key: "reference", header: "Approval reference", mono: true, render: (n: InvestmentNote) => n.approvalReference },
+              {
+                key: "actions",
+                header: "",
+                align: "right",
+                render: (n: InvestmentNote) => (
+                  <Button size="sm" variant={managementReportFor === n.contractId ? "secondary" : "primary"} onClick={() => handleGenerateManagementReport(n)}>
+                    {managementReportFor === n.contractId ? "Close" : "Report"}
+                  </Button>
+                ),
+              },
             ]}
             rows={investmentNotes.data}
             keyExtractor={(n) => n.contractId}
             emptyTitle="No notes issued yet"
             emptyDescription="Issue an approved filing above to see it here."
+          />
+        </CardBody>
+        {managementReportFor && (
+          <div className={styles.reviewPanel}>
+            {managementReportLoading && <p className={styles.complianceEmpty}>Consulting the Reporting Agent…</p>}
+            {managementReport && (
+              <div className={styles.documentsList}>
+                <details className={styles.documentItem} open>
+                  <summary>{managementReport.title}</summary>
+                  <pre className={styles.documentMarkdown}>{managementReport.markdown}</pre>
+                </details>
+              </div>
+            )}
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconClipboardCheck /> Compliance reports ({complianceReports.data.length})
+            </span>
+          }
+          description="Persisted compliance snapshots — a durable audit record, distinct from the live preview above."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (r: ComplianceReportItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{r.productName}</span>
+                    <span className={styles.productMeta}>{new Date(r.generatedAt).toLocaleString()}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (r: ComplianceReportItem) => (
+                  <StatusBadge tone={r.readyForSubmission ? "success" : "warning"}>{r.readyForSubmission ? "Ready" : "Not ready"}</StatusBadge>
+                ),
+              },
+              { key: "gaps", header: "Open gaps", mono: true, render: (r: ComplianceReportItem) => r.workflowGaps.length + r.shariahChecklistGaps.length },
+            ]}
+            rows={complianceReports.data}
+            keyExtractor={(r) => r.contractId}
+            emptyTitle="No compliance reports yet"
+            emptyDescription="Generate one above, from an approved Trustee review."
           />
         </CardBody>
       </Card>

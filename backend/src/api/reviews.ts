@@ -17,6 +17,7 @@ import {
   withdrawTrusteeReview,
 } from "../ledger/reviews.js";
 import { invokeIssuingHouseAssistant } from "../agents/client.js";
+import { logAuditEvent } from "../ledger/auditLog.js";
 
 export const reviewsRouter = Router();
 
@@ -187,6 +188,13 @@ reviewsRouter.post("/trustee-reviews/:contractId/compliance-check", requireRole(
       documents: [],
       priorRecommendations: [],
     },
+  });
+  await logAuditEvent({
+    actor: issuingHouse,
+    kind: "ComplianceCheckPerformed",
+    agent: "compliance",
+    summary: `Compliance check previewed for ${trusteeReview.productName}`,
+    dealId: req.params.contractId,
   });
   res.status(200).json(assessment);
 });

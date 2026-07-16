@@ -71,3 +71,50 @@ export async function invokeRiskAgent(context: AllocationRiskContext): Promise<R
   }
   return (await res.json()) as RiskInvokeResponse;
 }
+
+// Milestone 8 — Reporting Agent, called by four different personas for
+// four different report kinds; see the module comment on
+// agents/src/types.ts's ReportContextSchema.
+export interface ComplianceAssessment {
+  readyForSubmission: boolean;
+  missingDocuments: string[];
+  shariahChecklistGaps: string[];
+  workflowGaps: string[];
+  blockingIssues: string[];
+}
+
+export interface ReportContext {
+  reportType: "management" | "investor" | "compliance" | "regulatory";
+  dealId: string;
+  generatedFor?: string;
+  productName?: string;
+  symbol?: string;
+  structureType?: string;
+  targetSizeNGN?: number;
+  totalSupply?: number;
+  approvalReference?: string;
+  certificationNotes?: string;
+  approvalNotes?: string;
+  compliance?: ComplianceAssessment | null;
+  holdings?: Record<string, unknown>[];
+  distributions?: Record<string, unknown>[];
+}
+
+export interface ReportInvokeResponse {
+  agent: "reporting";
+  output: unknown;
+  model: string;
+  timestamp: string;
+}
+
+export async function invokeReportingAgent(context: ReportContext): Promise<ReportInvokeResponse> {
+  const res = await fetch(`${config.agentsServiceUrl}/internal/reports/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) {
+    throw new Error(`agents service returned ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as ReportInvokeResponse;
+}

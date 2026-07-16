@@ -12,9 +12,11 @@ import { useOrganizations } from "../../hooks/useOrganizations";
 import { useTrusteeReviews } from "../../hooks/useTrusteeReviews";
 import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import { useDistributionRequests } from "../../hooks/useDistributionRequests";
+import { useComplianceReports } from "../../hooks/useComplianceReports";
 import type { TrusteeReviewItem } from "../../api/reviewsApi";
 import type { InvestmentNote } from "../../api/investmentNotesApi";
 import type { DistributionRequestItem } from "../../api/distributionsApi";
+import type { ComplianceReportItem } from "../../api/reportsApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./TrusteeDashboard.module.css";
 
@@ -22,7 +24,7 @@ const NAV_ITEMS = [
   { label: "Reviews", active: true, icon: <IconFileText /> },
   { label: "Notes", active: true, icon: <IconLayers /> },
   { label: "Distributions", active: true, icon: <IconClipboardCheck /> },
-  { label: "Reports", disabled: true, icon: <IconShield /> },
+  { label: "Reports", active: true, icon: <IconShield /> },
 ];
 
 export default function TrusteeDashboard() {
@@ -33,6 +35,7 @@ export default function TrusteeDashboard() {
   const reviews = useTrusteeReviews(token);
   const investmentNotes = useInvestmentNotes(token);
   const distributionRequests = useDistributionRequests(token);
+  const complianceReports = useComplianceReports(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -98,7 +101,7 @@ export default function TrusteeDashboard() {
     }
   }
 
-  const error = actionError ?? orgs.error ?? reviews.error ?? investmentNotes.error ?? distributionRequests.error;
+  const error = actionError ?? orgs.error ?? reviews.error ?? investmentNotes.error ?? distributionRequests.error ?? complianceReports.error;
   const pending = reviews.data.filter((r) => r.status === "Pending");
   const approved = reviews.data.filter((r) => r.status === "Approved");
 
@@ -370,6 +373,45 @@ export default function TrusteeDashboard() {
               </div>
             );
           })()}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconShield /> Compliance reports ({complianceReports.data.length})
+            </span>
+          }
+          description="Compliance snapshots the Issuing House has persisted for deals you reviewed."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (r: ComplianceReportItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{r.productName}</span>
+                    <span className={styles.productMeta}>{new Date(r.generatedAt).toLocaleString()}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (r: ComplianceReportItem) => (
+                  <StatusBadge tone={r.readyForSubmission ? "success" : "warning"}>{r.readyForSubmission ? "Ready" : "Not ready"}</StatusBadge>
+                ),
+              },
+              { key: "gaps", header: "Open gaps", mono: true, render: (r: ComplianceReportItem) => r.workflowGaps.length + r.shariahChecklistGaps.length },
+            ]}
+            rows={complianceReports.data}
+            keyExtractor={(r) => r.contractId}
+            emptyTitle="No compliance reports yet"
+            emptyDescription="The Issuing House can persist one from an approved review."
+          />
+        </CardBody>
       </Card>
     </AppShell>
   );

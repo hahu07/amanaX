@@ -11,6 +11,7 @@ import {
   withdrawProposal,
 } from "../ledger/products.js";
 import { invokeIssuingHouseAssistant } from "../agents/client.js";
+import { logAuditEvent } from "../ledger/auditLog.js";
 
 export const proposalsRouter = Router();
 
@@ -88,6 +89,13 @@ proposalsRouter.post("/proposals/:contractId/structuring-recommendation", requir
       documents: [],
       priorRecommendations: [],
     },
+  });
+  await logAuditEvent({
+    actor: issuingHouse,
+    kind: "StructuringRecommendationShown",
+    agent: "product-structuring",
+    summary: `Structuring recommendation shown for ${proposal.productName}`,
+    dealId: req.params.contractId,
   });
   res.status(200).json(recommendation);
 });

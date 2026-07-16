@@ -1,0 +1,33 @@
+module AmanaX.Audit.AuditLogTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Audit.AuditLog
+
+-- | Milestone 8: an off-ledger AI-agent event, recorded for audit —
+-- visible to the operator (signatory) and the acting party (observer),
+-- not to unrelated parties.
+auditLogTest : Script ()
+auditLogTest = do
+  operator <- allocateParty "PlatformOperatorAudit"
+  actor <- allocateParty "ActorAudit"
+  otherParty <- allocateParty "OtherPartyAudit"
+
+  now <- getTime
+  logCid <- submit operator do
+    createCmd AuditLog with
+      operator
+      actor
+      kind = ComplianceCheckPerformed
+      agent = "compliance"
+      summary = "Compliance check run for deal deal-123 — readyForSubmission: true"
+      dealId = "deal-123"
+      occurredAt = now
+
+  actorView <- queryContractId actor logCid
+  case actorView of
+    None -> error "expected actor to see their own audit entry"
+    Some l -> l.kind === ComplianceCheckPerformed
+
+  otherView <- queryContractId otherParty logCid
+  otherView === None
