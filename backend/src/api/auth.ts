@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import { signToken } from "../auth/jwt.js";
 import { requireAuth } from "../auth/middleware.js";
 import { findUserByEmail } from "../ledger/organizations.js";
+import { findInvestorProfileByEmail } from "../ledger/investors.js";
 import { getOperatorParty } from "../ledger/operator.js";
 
 export const authRouter = Router();
@@ -33,12 +34,20 @@ authRouter.post("/auth/login", async (req, res) => {
 
   const operator = await getOperatorParty();
   const user = await findUserByEmail(operator, email);
-  if (!user) {
+  if (user) {
+    const token = signToken({ sub: user.userId, org: user.org, role: user.role, displayName: user.displayName });
+    res.status(200).json({ token, role: user.role, org: user.org, party: user.org });
+    return;
+  }
+
+  // Investor is not an OrgRole/User — see auth/types.ts's module comment.
+  const investorProfile = await findInvestorProfileByEmail(operator, email);
+  if (!investorProfile) {
     res.status(401).json({ error: "no active user found for this email" });
     return;
   }
-  const token = signToken({ sub: user.userId, org: user.org, role: user.role, displayName: user.displayName });
-  res.status(200).json({ token, role: user.role, org: user.org, party: user.org });
+  const token = signToken({ sub: investorProfile.email, org: investorProfile.investor, role: "Investor", displayName: investorProfile.fullName });
+  res.status(200).json({ token, role: "Investor", org: investorProfile.investor, party: investorProfile.investor });
 });
 
 authRouter.get("/me", requireAuth, (req, res) => {

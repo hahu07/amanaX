@@ -1,0 +1,69 @@
+module AmanaX.Investor.InvestorProfileTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Investor.InvestorProfile
+
+-- | Step 11 (docs/prompt.md): an Investor's KYC record is created Pending,
+-- then the chosen Distributor can Verify or Reject it.
+verifyAndRejectTest : Script ()
+verifyAndRejectTest = do
+  operator <- allocateParty "PlatformOperatorInv"
+  investor1 <- allocateParty "InvestorOne"
+  investor2 <- allocateParty "InvestorTwo"
+  distributor <- allocateParty "DistributorInvCo"
+
+  profile1Cid <- submit operator do
+    createCmd InvestorProfile with
+      operator
+      investor = investor1
+      distributor
+      fullName = "Amina Bello"
+      email = "amina@example.com"
+      kycStatus = KycPending
+
+  verifiedCid <- submit distributor do
+    exerciseCmd profile1Cid InvestorProfile_Verify
+
+  verified <- queryContractId investor1 verifiedCid
+  case verified of
+    None -> error "expected verified profile to exist"
+    Some p -> p.kycStatus === KycVerified
+
+  profile2Cid <- submit operator do
+    createCmd InvestorProfile with
+      operator
+      investor = investor2
+      distributor
+      fullName = "Chidi Okafor"
+      email = "chidi@example.com"
+      kycStatus = KycPending
+
+  rejectedCid <- submit distributor do
+    exerciseCmd profile2Cid InvestorProfile_Reject with
+      rejectionReason = "Incomplete identification documents."
+
+  rejected <- queryContractId investor2 rejectedCid
+  case rejected of
+    None -> error "expected rejected profile to exist"
+    Some p -> p.kycStatus === KycRejected
+
+-- | Only the assigned Distributor can decide the KYC outcome — not the
+-- investor themselves, and not an unrelated party.
+onlyDistributorCanDecideTest : Script ()
+onlyDistributorCanDecideTest = do
+  operator <- allocateParty "PlatformOperatorInv2"
+  investor <- allocateParty "InvestorThree"
+  distributor <- allocateParty "DistributorInvCo2"
+
+  profileCid <- submit operator do
+    createCmd InvestorProfile with
+      operator
+      investor
+      distributor
+      fullName = "Ngozi Eze"
+      email = "ngozi@example.com"
+      kycStatus = KycPending
+
+  submitMustFail investor do
+    exerciseCmd profileCid InvestorProfile_Verify

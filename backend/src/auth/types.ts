@@ -1,6 +1,10 @@
 import type { OrgRole } from "../ledger/organizations.js";
 
-export type Role = "PlatformOperator" | OrgRole;
+// Investor is deliberately not an OrgRole — see the module comment on
+// AmanaX.Identity.Organization.OrgRole and AmanaX.Investor.InvestorProfile:
+// an Investor is an individual with its own platform-managed party, not a
+// firm sharing one party across multiple Users.
+export type Role = "PlatformOperator" | OrgRole | "Investor";
 
 // What the backend's RBAC layer maps a JWT-authenticated request to: an org
 // party (null for the Platform Operator, who isn't an Organization) and a

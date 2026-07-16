@@ -51,6 +51,39 @@ export type GeneratedDocument = z.infer<typeof GeneratedDocumentSchema>;
 export const IntentSchema = z.enum(["structure", "assess-compliance", "generate-documents"]);
 export type Intent = z.infer<typeof IntentSchema>;
 
+// Milestone 6 — Risk Agent input. A deliberately flatter, different shape
+// from DealContext: the Risk Agent runs at a different workflow step
+// (Step 13, allocation) for a different persona (Distributor, not Issuing
+// House), so it doesn't go through the Issuing House Assistant's
+// supervisor graph — see agents/src/index.ts's dedicated
+// /internal/risk/assess route and docs/milestones/milestone-6.md Findings.
+export const AllocationRiskContextSchema = z.object({
+  structureType: z.enum(["Murabahah", "Ijarah", "Wakalah", "Mudarabah"]),
+  tenorMonths: z.number(),
+  targetSizeNGN: z.number(),
+  minSubscriptionNGN: z.number(),
+  requestedAmountNGN: z.number(),
+  alreadyAllocatedNGN: z.number(),
+});
+export type AllocationRiskContext = z.infer<typeof AllocationRiskContextSchema>;
+
+const RiskTierSchema = z.enum(["Low", "Medium", "High"]);
+
+// docs/prompt.md's Risk Agent: "product risk assessment, operational risk
+// review, concentration analysis." Advisory only — unlike the Compliance
+// Agent (a real submission gate since Milestone 4), nothing in the
+// backend blocks on this output; it's surfaced to the Distributor as a
+// recommendation before they decide the allocated amount.
+export const RiskAssessmentSchema = z.object({
+  concentrationPct: z.number(),
+  concentrationTier: RiskTierSchema,
+  productRiskTier: RiskTierSchema,
+  operationalFlags: z.array(z.string()),
+  overallRisk: RiskTierSchema,
+  notes: z.string(),
+});
+export type RiskAssessment = z.infer<typeof RiskAssessmentSchema>;
+
 // §6.4 — backend <-> agents service contract
 export const InvokeRequestSchema = z.object({
   dealId: z.string(),

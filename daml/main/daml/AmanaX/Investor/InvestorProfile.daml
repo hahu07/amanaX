@@ -1,0 +1,48 @@
+module AmanaX.Investor.InvestorProfile where
+
+-- | Step 11 (docs/prompt.md): "Investors complete onboarding." Unlike every
+-- other role, an Investor is not an Organization — it's an individual, and
+-- gets its own platform-managed Daml party rather than sharing a firm's
+-- party the way multiple Users share one Organization's party (§3.3, and
+-- the module comment on AmanaX.Identity.Organization.OrgRole). This record
+-- is both the identity record (its `investor` party is freshly allocated
+-- at creation, same as an Organization's `party`) and the KYC record, in
+-- one template — there's no separate User-equivalent for investors since
+-- there's exactly one human per investor party.
+data KycStatus
+  = KycPending
+  | KycVerified
+  | KycRejected
+  deriving (Eq, Show)
+
+-- | Signatory operator, same authorization shape as Organization/User:
+-- the platform (backend, acting with the Operator's authority) admits the
+-- investor onto the network by allocating its party and creating this
+-- record — even though the investor self-initiates onboarding, the actual
+-- ledger write is backend-driven, consistent with every other identity
+-- record in this system. The chosen Distributor is an observer so it can
+-- review and decide on the KYC outcome.
+template InvestorProfile
+  with
+    operator : Party
+    investor : Party
+    distributor : Party
+    fullName : Text
+    email : Text
+    kycStatus : KycStatus
+  where
+    signatory operator
+    observer investor, distributor
+
+    ensure fullName /= "" && email /= ""
+
+    -- No contract key — see the same note in Organization.daml.
+
+    choice InvestorProfile_Verify : ContractId InvestorProfile
+      controller distributor
+      do create this with kycStatus = KycVerified
+
+    choice InvestorProfile_Reject : ContractId InvestorProfile
+      with rejectionReason : Text
+      controller distributor
+      do create this with kycStatus = KycRejected

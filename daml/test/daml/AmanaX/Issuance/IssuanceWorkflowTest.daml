@@ -23,6 +23,7 @@ issuanceTest = do
   shariahAdvisor <- allocateParty "ShariahAdvisorIssCo"
   trustee <- allocateParty "TrusteeIssCo"
   sec <- allocateParty "SECIssCo"
+  operator <- allocateParty "PlatformOperatorIssCo"
 
   proposalCid <- submit fundManager do
     createCmd ProductProposal with
@@ -109,6 +110,7 @@ issuanceTest = do
   noteCid <- submit issuingHouse do
     createCmd InvestmentNote with
       issuingHouse
+      operator
       sec
       sponsor = fundManager
       trustee
@@ -165,6 +167,7 @@ mismatchedInstrumentIdRejectedTest = do
   sec <- allocateParty "SECIssCo2"
   fundManager <- allocateParty "FundManagerIssCo2"
   trustee <- allocateParty "TrusteeIssCo2"
+  operator <- allocateParty "PlatformOperatorIssCo2"
 
   proposalCid <- submit fundManager do
     createCmd ProductProposal with
@@ -243,6 +246,7 @@ mismatchedInstrumentIdRejectedTest = do
   submitMustFail issuingHouse do
     createCmd InvestmentNote with
       issuingHouse
+      operator
       sec
       sponsor = fundManager
       trustee

@@ -1,0 +1,148 @@
+module AmanaX.Subscription.Subscription where
+
+import DA.TextMap qualified as TextMap
+import AmanaX.Product.Types (ProductType)
+import AmanaX.Issuance.Issuance (InvestmentNote)
+import Splice.Api.Token.HoldingV1 (Holding, HoldingView(..), InstrumentId)
+import Splice.Api.Token.MetadataV1 (Metadata(..))
+
+-- | Step 12-13 (docs/prompt.md): an Investor subscribes to an issued
+-- InvestmentNote; the Distributor decides whether (and how much) to
+-- allocate. Same propose-accept shape as every other two-party decision
+-- point in this codebase (ShariahReviewRequest, RegulatorySubmission) —
+-- both templates live in this module because `Allocate` needs
+-- `ContractId Allocation` as its result type.
+--
+-- `distributor` is never client-supplied at submission time — the backend
+-- derives it from the investor's own `InvestorProfile` (see
+-- backend/src/api/subscriptions.ts), the same "server re-derives, never
+-- trusts the client" rule already applied to `sponsorType` in
+-- api/proposals.ts. Deal facts (symbol, productName, parValueNGN,
+-- targetSizeNGN) are copied forward from the InvestmentNote, continuing
+-- the copy-forward pattern from every prior stage.
+template SubscriptionRequest
+  with
+    investor : Party
+    distributor : Party
+    issuingHouse : Party
+    sponsor : Party
+    noteCid : ContractId InvestmentNote
+    instrumentId : InstrumentId
+    symbol : Text
+    productName : Text
+    structureType : ProductType
+    tenorMonths : Int
+    parValueNGN : Decimal
+    targetSizeNGN : Decimal
+    minSubscriptionNGN : Decimal
+    amountNGN : Decimal
+  where
+    signatory investor
+    observer distributor, issuingHouse, sponsor
+
+    ensure amountNGN > 0.0
+
+    choice SubscriptionRequest_Withdraw : ()
+      controller investor
+      do pure ()
+
+    choice SubscriptionRequest_Reject : ()
+      with rejectionReason : Text
+      controller distributor
+      do pure ()
+
+    -- | The Distributor decides the final allocated amount — it MAY be
+    -- less than `amountNGN` if the offering is oversubscribed (the
+    -- backend enforces the hard "can't exceed the note's totalSupply"
+    -- rule server-side before exercising this choice; see Findings in
+    -- docs/milestones/milestone-6.md for why that can't be a Daml `ensure`
+    -- clause here — it would need to sum every other Allocation for this
+    -- instrument, which isn't expressible without contract keys under
+    -- LF 2.1). `riskNotes` carries forward the AI Risk Agent's assessment
+    -- the Distributor reviewed before deciding, for audit purposes.
+    choice SubscriptionRequest_Allocate : ContractId Allocation
+      with
+        allocatedAmountNGN : Decimal
+        riskNotes : Text
+      controller distributor
+      do
+        create Allocation with
+          issuingHouse
+          distributor
+          investor
+          sponsor
+          subscriptionCid = self
+          instrumentId
+          symbol
+          productName
+          structureType
+          tenorMonths
+          parValueNGN
+          amountNGN = allocatedAmountNGN
+          units = allocatedAmountNGN / parValueNGN
+          riskNotes
+          meta = allocationMetadata productName symbol
+
+-- | Step 13's terminal record: the Investor's position in the issued
+-- note. Signatory `distributor` (not `issuingHouse`) — the Distributor is
+-- the controller of `SubscriptionRequest_Allocate`, so its authority is
+-- what's actually available to sign this contract's creation without
+-- requiring a separate `actAs` from the Issuing House; this also matches
+-- real-world placement-agent practice, where the distributor administers
+-- the cap-table entry it creates during placement, not the issuer itself.
+--
+-- Implements the CIP-0056 `Holding` interface for real — a query for
+-- `Holding` on the investor's party genuinely returns this contract, with
+-- `instrumentId` matching the InvestmentNote's own (Milestone 5). Does
+-- NOT implement CIP-0056's `Allocation` / `AllocationInstruction` /
+-- `TransferInstruction` interfaces (from splice-api-token-allocation-v1,
+-- -allocation-instruction-v1, -transfer-instruction-v1) despite the name
+-- and docs/prompt.md's own template list — those model a temporary
+-- reservation of a Holding for one leg of a cross-app atomic settlement
+-- (a DVP protocol between independent registries), which is a different
+-- concept from "the units this investor was allocated in a single-app,
+-- single-registry issuance." Building that settlement-coordination
+-- machinery for a closed-loop workflow with no second registry to settle
+-- against would be pure surface area with no behavior behind it — see
+-- Findings in docs/milestones/milestone-6.md.
+template Allocation
+  with
+    issuingHouse : Party
+    distributor : Party
+    investor : Party
+    sponsor : Party
+    subscriptionCid : ContractId SubscriptionRequest
+    instrumentId : InstrumentId
+    symbol : Text
+    productName : Text
+    structureType : ProductType
+    tenorMonths : Int
+    parValueNGN : Decimal
+    amountNGN : Decimal
+    units : Decimal
+    riskNotes : Text
+    meta : Metadata
+  where
+    signatory distributor
+    observer investor, issuingHouse, sponsor
+
+    ensure units > 0.0 && amountNGN > 0.0
+
+    interface instance Holding for Allocation where
+      view = HoldingView with
+        owner = investor
+        instrumentId = instrumentId
+        amount = units
+        lock = None
+        meta = meta
+
+-- | Mirrors AmanaX.Issuance.Issuance's investmentNoteMetadata helper —
+-- pulled out so the real creation path and any Daml Script tests can't
+-- drift on which keys get set.
+allocationMetadata : Text -> Text -> Metadata
+allocationMetadata productName symbol =
+  Metadata with
+    values = TextMap.fromList
+      [ ("amanax.io/name", productName)
+      , ("amanax.io/symbol", symbol)
+      ]

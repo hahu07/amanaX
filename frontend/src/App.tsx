@@ -4,6 +4,7 @@ import { ROLE_ROUTE } from "./auth/types";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
+import InvestorSignupPage from "./pages/InvestorSignupPage";
 import OperatorDashboard from "./dashboards/operator/OperatorDashboard";
 import ProductSponsorDashboard from "./dashboards/productSponsor/ProductSponsorDashboard";
 import IssuingHouseDashboard from "./dashboards/issuingHouse/IssuingHouseDashboard";
@@ -30,6 +31,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<RootRedirect />} />
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/investor-signup" element={<InvestorSignupPage />} />
           <Route
             path="/dashboard/operator"
             element={
@@ -102,8 +104,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          {/* Investor has no login path yet (Milestone 6) — route kept reachable for UI review. */}
-          <Route path="/dashboard/investor" element={<InvestorDashboard />} />
+          <Route
+            path="/dashboard/investor"
+            element={
+              <ProtectedRoute allow={["Investor"]}>
+                <InvestorDashboard />
+              </ProtectedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </BrowserRouter>

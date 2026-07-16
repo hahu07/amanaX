@@ -88,7 +88,8 @@
   color: var(--text-secondary);
 }
 
-.field input {
+.field input,
+.field select {
   height: 40px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
@@ -98,7 +99,8 @@
   color: var(--text-primary);
 }
 
-.field input:focus-visible {
+.field input:focus-visible,
+.field select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
   border-color: var(--accent);

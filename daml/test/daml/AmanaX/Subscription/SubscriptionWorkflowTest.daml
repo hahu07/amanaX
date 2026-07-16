@@ -1,0 +1,359 @@
+module AmanaX.Subscription.SubscriptionWorkflowTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Identity.Organization (OrgRole(..))
+import AmanaX.Product.Types
+import AmanaX.Product.ProductProposal
+import AmanaX.Product.ProductStructure
+import AmanaX.Review.Review
+import AmanaX.Regulatory.Regulatory
+import AmanaX.Issuance.Issuance
+import AmanaX.Investor.InvestorProfile
+import AmanaX.Subscription.Subscription
+import Splice.Api.Token.HoldingV1 (Holding, InstrumentId(..))
+
+-- | Milestone 6 gate: an investor can onboard, subscribe, and be
+-- allocated a standard-compliant Holding of the issued note. Continues on
+-- from an issued InvestmentNote (same setup as
+-- AmanaX.Issuance.IssuanceWorkflowTest.issuanceTest), then proves the
+-- resulting Allocation is genuinely queryable through the CIP-0056
+-- `Holding` interface, not just structurally similar to one.
+subscriptionAllocationTest : Script ()
+subscriptionAllocationTest = do
+  fundManager <- allocateParty "FundManagerSubCo"
+  issuingHouse <- allocateParty "IssuingHouseSubCo"
+  shariahAdvisor <- allocateParty "ShariahAdvisorSubCo"
+  trustee <- allocateParty "TrusteeSubCo"
+  sec <- allocateParty "SECSubCo"
+  operator <- allocateParty "PlatformOperatorSubCo"
+  distributor <- allocateParty "DistributorSubCo"
+  investor <- allocateParty "InvestorSubCo"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      proposedType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Ijarah
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      structureTenorMonths = 24
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+
+  shariahReviewCid <- submit shariahAdvisor do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "Structure conforms to Ijarah principles."
+
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "Governance and investor-protection terms are adequate."
+
+  submissionCid <- submit issuingHouse do
+    createCmd RegulatorySubmission with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      structureCid = finalizedCid
+      trusteeReviewCid
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      certificationNotes = "Structure conforms to Ijarah principles."
+      approvalNotes = "Governance and investor-protection terms are adequate."
+      documents = []
+
+  approvalCid <- submit sec do
+    exerciseCmd submissionCid RegulatorySubmission_Approve with
+      approvalReference = "SEC/AMX/2026/0001"
+
+  now <- getTime
+  let symbol = "AMXSNI"
+      parValueNGN = 1000000.0
+      totalSupply = 500000000.0 / parValueNGN
+      instrumentId = InstrumentId with admin = issuingHouse, id = symbol
+      meta = investmentNoteMetadata "AmanaX Sukuk Note I" symbol Ijarah totalSupply parValueNGN 24
+
+  noteCid <- submit issuingHouse do
+    createCmd InvestmentNote with
+      issuingHouse
+      operator
+      sec
+      sponsor = fundManager
+      trustee
+      approvalCid
+      instrumentId
+      symbol
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      parValueNGN
+      totalSupply
+      meta
+      approvalReference = "SEC/AMX/2026/0001"
+      issuedAt = now
+
+  -- Step 11: Investor onboards (Pending), Distributor verifies KYC.
+  profileCid <- submit operator do
+    createCmd InvestorProfile with
+      operator
+      investor
+      distributor
+      fullName = "Amina Bello"
+      email = "amina@example.com"
+      kycStatus = KycPending
+
+  _ <- submit distributor do
+    exerciseCmd profileCid InvestorProfile_Verify
+
+  -- Step 12: Investor subscribes.
+  subscriptionCid <- submit investor do
+    createCmd SubscriptionRequest with
+      investor
+      distributor
+      issuingHouse
+      sponsor = fundManager
+      noteCid
+      instrumentId
+      symbol
+      productName = "AmanaX Sukuk Note I"
+      structureType = Ijarah
+      tenorMonths = 24
+      parValueNGN
+      targetSizeNGN = 500000000.0
+      minSubscriptionNGN = 1000000.0
+      amountNGN = 5000000.0
+
+  -- Step 13: Distributor allocates (in full, in this test).
+  allocationCid <- submit distributor do
+    exerciseCmd subscriptionCid SubscriptionRequest_Allocate with
+      allocatedAmountNGN = 5000000.0
+      riskNotes = "Concentration 1% of total offering size — low risk."
+
+  -- issuingHouse and sponsor can both see the allocation as observers.
+  ihView <- queryContractId issuingHouse allocationCid
+  case ihView of
+    None -> error "expected issuingHouse to see the allocation"
+    Some _ -> pure ()
+  sponsorView <- queryContractId fundManager allocationCid
+  case sponsorView of
+    None -> error "expected sponsor to see the allocation"
+    Some _ -> pure ()
+
+  allocation <- queryContractId investor allocationCid
+  case allocation of
+    None -> error "expected Allocation to exist"
+    Some a -> do
+      a.units === 5.0
+      a.amountNGN === 5000000.0
+
+  -- The gate: the Allocation is genuinely queryable through the
+  -- CIP-0056 Holding interface, not just structurally similar to one.
+  holdings <- queryInterface @Holding investor
+  case holdings of
+    [(_, Some view)] -> do
+      view.owner === investor
+      view.instrumentId === instrumentId
+      view.amount === 5.0
+      view.lock === None
+    other -> error ("expected exactly one Holding for the investor, got: " <> show (length other))
+
+-- | Investor can withdraw before the Distributor decides; Distributor can
+-- reject instead of allocating.
+withdrawAndRejectSubscriptionTest : Script ()
+withdrawAndRejectSubscriptionTest = do
+  issuingHouse <- allocateParty "IssuingHouseSubCo2"
+  fundManager <- allocateParty "FundManagerSubCo2"
+  shariahAdvisor <- allocateParty "ShariahAdvisorSubCo2"
+  trustee <- allocateParty "TrusteeSubCo2"
+  sec <- allocateParty "SECSubCo2"
+  operator <- allocateParty "PlatformOperatorSubCo2"
+  distributor <- allocateParty "DistributorSubCo2"
+  investor <- allocateParty "InvestorSubCo2"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "Withdrawn Subscription Note"
+      description = "Used to test subscription withdraw/reject."
+      proposedType = Murabahah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 12
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Murabahah
+      profitMechanism = "Fixed cost-plus markup"
+      minSubscriptionNGN = 500000.0
+      redemptionTerms = "Bullet"
+      structureTenorMonths = 12
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "Withdrawn Subscription Note"
+      description = "Used to test subscription withdraw/reject."
+      structureType = Murabahah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 12
+      profitMechanism = "Fixed cost-plus markup"
+      minSubscriptionNGN = 500000.0
+      redemptionTerms = "Bullet"
+
+  shariahReviewCid <- submit shariahAdvisor do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "OK."
+
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "OK."
+
+  submissionCid <- submit issuingHouse do
+    createCmd RegulatorySubmission with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      structureCid = finalizedCid
+      trusteeReviewCid
+      productName = "Withdrawn Subscription Note"
+      description = "Used to test subscription withdraw/reject."
+      structureType = Murabahah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 12
+      profitMechanism = "Fixed cost-plus markup"
+      minSubscriptionNGN = 500000.0
+      redemptionTerms = "Bullet"
+      certificationNotes = "OK."
+      approvalNotes = "OK."
+      documents = []
+
+  approvalCid <- submit sec do
+    exerciseCmd submissionCid RegulatorySubmission_Approve with
+      approvalReference = "SEC/AMX/2026/0002"
+
+  now <- getTime
+  let instrumentId = InstrumentId with admin = issuingHouse, id = "AMXSUB2"
+
+  noteCid <- submit issuingHouse do
+    createCmd InvestmentNote with
+      issuingHouse
+      operator
+      sec
+      sponsor = fundManager
+      trustee
+      approvalCid
+      instrumentId
+      symbol = "AMXSUB2"
+      productName = "Withdrawn Subscription Note"
+      description = "Used to test subscription withdraw/reject."
+      structureType = Murabahah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 12
+      profitMechanism = "Fixed cost-plus markup"
+      minSubscriptionNGN = 500000.0
+      redemptionTerms = "Bullet"
+      parValueNGN = 1000000.0
+      totalSupply = 100.0
+      meta = investmentNoteMetadata "Withdrawn Subscription Note" "AMXSUB2" Murabahah 100.0 1000000.0 12
+      approvalReference = "SEC/AMX/2026/0002"
+      issuedAt = now
+
+  subscriptionCid <- submit investor do
+    createCmd SubscriptionRequest with
+      investor
+      distributor
+      issuingHouse
+      sponsor = fundManager
+      noteCid
+      instrumentId
+      symbol = "AMXSUB2"
+      productName = "Withdrawn Subscription Note"
+      structureType = Murabahah
+      tenorMonths = 12
+      parValueNGN = 1000000.0
+      targetSizeNGN = 100000000.0
+      minSubscriptionNGN = 500000.0
+      amountNGN = 2000000.0
+
+  submit investor do
+    exerciseCmd subscriptionCid SubscriptionRequest_Withdraw
+
+  submitMustFail distributor do
+    exerciseCmd subscriptionCid SubscriptionRequest_Allocate with
+      allocatedAmountNGN = 2000000.0
+      riskNotes = "should fail — already withdrawn"
+
+  subscription2Cid <- submit investor do
+    createCmd SubscriptionRequest with
+      investor
+      distributor
+      issuingHouse
+      sponsor = fundManager
+      noteCid
+      instrumentId
+      symbol = "AMXSUB2"
+      productName = "Rejected Subscription Note"
+      structureType = Murabahah
+      tenorMonths = 12
+      parValueNGN = 1000000.0
+      targetSizeNGN = 100000000.0
+      minSubscriptionNGN = 500000.0
+      amountNGN = 2000000.0
+
+  submit distributor do
+    exerciseCmd subscription2Cid SubscriptionRequest_Reject with
+      rejectionReason = "KYC could not be completed in time."

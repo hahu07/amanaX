@@ -34,6 +34,7 @@ import Splice.Api.Token.MetadataV1 (Metadata(..))
 template InvestmentNote
   with
     issuingHouse : Party
+    operator : Party
     sec : Party
     sponsor : Party
     trustee : Party
@@ -55,7 +56,14 @@ template InvestmentNote
     issuedAt : Time
   where
     signatory issuingHouse
-    observer sec, sponsor, trustee
+    -- `operator` added in Milestone 6: an Investor has no stakeholder
+    -- relationship to any InvestmentNote until they're allocated one, so
+    -- there's no party an investor could browse "available offerings"
+    -- through directly. The backend serves that browsing list by querying
+    -- as the Platform Operator (already the broad-visibility
+    -- administrative party for Organization/User) instead of inventing a
+    -- separate off-ledger index of issued notes.
+    observer sec, sponsor, trustee, operator
 
     ensure
       parValueNGN > 0.0

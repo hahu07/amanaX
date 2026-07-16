@@ -10,7 +10,10 @@ export const ORG_ROLES = [
 ] as const;
 export type OrgRole = (typeof ORG_ROLES)[number];
 
-export type Role = "PlatformOperator" | OrgRole;
+// Investor is deliberately not an OrgRole — see backend/src/auth/types.ts's
+// module comment: an Investor is an individual with its own
+// platform-managed party, not a firm sharing one party across Users.
+export type Role = "PlatformOperator" | OrgRole | "Investor";
 
 export interface AuthState {
   token: string;
@@ -34,6 +37,7 @@ export const ROLE_ROUTE: Record<Role, string> = {
   Distributor: "distributor",
   SEC: "sec",
   Issuer: "issuer",
+  Investor: "investor",
 };
 
 // Human-readable label for a backend role — used across the UI (top bar,
@@ -48,4 +52,5 @@ export const ROLE_LABEL: Record<Role, string> = {
   Distributor: "Distributor",
   SEC: "SEC",
   Issuer: "Issuer",
+  Investor: "Investor",
 };

@@ -1,6 +1,7 @@
-import { Router } from "express";
+import { Router, type Request } from "express";
 import { z } from "zod";
 import { requireAuth, requireOrgParty, requireRole } from "../auth/middleware.js";
+import { getOperatorParty } from "../ledger/operator.js";
 import { findApprovalById } from "../ledger/regulatory.js";
 import { findNoteByApprovalCid, findNoteBySymbol, issueNote, listNotes } from "../ledger/issuance.js";
 
@@ -8,11 +9,20 @@ export const issuanceRouter = Router();
 
 issuanceRouter.use(requireAuth);
 
-// Same read RBAC as GET /regulatory-submissions — InvestmentNote has the
-// identical signatory/observer shape as SECApproval (issuingHouse,
-// sec, sponsor, trustee), so these are exactly the roles with any
-// ledger-level visibility into it.
-const NOTE_READERS = ["IssuingHouse", "SEC", "FundManager", "Issuer", "Trustee"] as const;
+// InvestmentNote's signatory/observer set is issuingHouse, sec, sponsor,
+// trustee, operator (Milestone 6 added operator — see the module comment
+// on daml/main/daml/AmanaX/Issuance/Issuance.daml). Investor is included
+// here too, but reads via the operator's party, not its own — an Investor
+// has no stakeholder relationship to a note until it's allocated one, so
+// there's nothing to query directly as the investor.
+const NOTE_READERS = ["IssuingHouse", "SEC", "FundManager", "Issuer", "Trustee", "Investor"] as const;
+
+async function readerParty(req: Request): Promise<string> {
+  if (req.auth?.role === "Investor") {
+    return getOperatorParty();
+  }
+  return requireOrgParty(req);
+}
 
 const issueSchema = z.object({
   symbol: z
@@ -57,6 +67,7 @@ issuanceRouter.post("/sec-approvals/:contractId/issue", requireRole("IssuingHous
 
   const note = await issueNote({
     issuingHouse,
+    operator: await getOperatorParty(),
     sec: approval.sec,
     sponsor: approval.sponsor,
     trustee: approval.trustee,
@@ -77,7 +88,7 @@ issuanceRouter.post("/sec-approvals/:contractId/issue", requireRole("IssuingHous
 });
 
 issuanceRouter.get("/investment-notes", requireRole(...NOTE_READERS), async (req, res) => {
-  const notes = await listNotes(requireOrgParty(req));
+  const notes = await listNotes(await readerParty(req));
   res.status(200).json(notes);
 });
 
@@ -85,7 +96,7 @@ issuanceRouter.get("/investment-notes", requireRole(...NOTE_READERS), async (req
 // Metadata" gate for this milestone, separate from the full note object so
 // a Token Standard-aware caller can fetch just {instrumentId, meta}.
 issuanceRouter.get("/investment-notes/:contractId/metadata", requireRole(...NOTE_READERS), async (req, res) => {
-  const notes = await listNotes(requireOrgParty(req));
+  const notes = await listNotes(await readerParty(req));
   const note = notes.find((n) => n.contractId === req.params.contractId);
   if (!note) {
     res.status(404).json({ error: "investment note not found" });

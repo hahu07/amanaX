@@ -63,7 +63,7 @@ export default function LoginPage() {
         </form>
 
         <div className={styles.footerLink}>
-          <Link to="/">← Back to AmanaX</Link>
+          <Link to="/">← Back to AmanaX</Link> · <Link to="/investor-signup">New investor? Create an account</Link>
         </div>
       </div>
     </main>

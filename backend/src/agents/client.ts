@@ -40,3 +40,34 @@ export async function invokeIssuingHouseAssistant(params: {
   }
   return (await res.json()) as InvokeResponse;
 }
+
+// Milestone 6 — Risk Agent, a separate call from the Issuing House
+// Assistant above (different persona/workflow step; see the module
+// comment on agents/src/types.ts's AllocationRiskContextSchema).
+export interface AllocationRiskContext {
+  structureType: "Murabahah" | "Ijarah" | "Wakalah" | "Mudarabah";
+  tenorMonths: number;
+  targetSizeNGN: number;
+  minSubscriptionNGN: number;
+  requestedAmountNGN: number;
+  alreadyAllocatedNGN: number;
+}
+
+export interface RiskInvokeResponse {
+  agent: "risk";
+  output: unknown;
+  model: string;
+  timestamp: string;
+}
+
+export async function invokeRiskAgent(context: AllocationRiskContext): Promise<RiskInvokeResponse> {
+  const res = await fetch(`${config.agentsServiceUrl}/internal/risk/assess`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(context),
+  });
+  if (!res.ok) {
+    throw new Error(`agents service returned ${res.status}: ${await res.text()}`);
+  }
+  return (await res.json()) as RiskInvokeResponse;
+}

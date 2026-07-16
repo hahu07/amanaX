@@ -11,6 +11,7 @@ const NOTE_TEMPLATE_ID = templateId("AmanaX.Issuance.Issuance", "InvestmentNote"
 export interface InvestmentNote {
   contractId: string;
   issuingHouse: string;
+  operator: string;
   sec: string;
   sponsor: string;
   trustee: string;
@@ -39,6 +40,7 @@ function toNote(contractId: string, arg: unknown): InvestmentNote {
   return {
     contractId,
     issuingHouse: a.issuingHouse as string,
+    operator: a.operator as string,
     sec: a.sec as string,
     sponsor: a.sponsor as string,
     trustee: a.trustee as string,
@@ -84,6 +86,7 @@ export async function findNoteBySymbol(issuingHouse: string, symbol: string): Pr
 
 export async function issueNote(params: {
   issuingHouse: string;
+  operator: string;
   sec: string;
   sponsor: string;
   trustee: string;
@@ -114,6 +117,7 @@ export async function issueNote(params: {
     actAs: [params.issuingHouse],
     createArguments: {
       issuingHouse: params.issuingHouse,
+      operator: params.operator,
       sec: params.sec,
       sponsor: params.sponsor,
       trustee: params.trustee,
