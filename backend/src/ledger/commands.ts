@@ -114,6 +114,49 @@ export async function submitExercise(params: {
   return { contractId: created.CreatedEvent.contractId, createArgument: created.CreatedEvent.createArgument };
 }
 
+// For choices that create *multiple* contracts in one transaction (e.g.
+// DistributionRequest_Approve creating one ProfitDistribution per investor
+// share) — submitExercise only returns the last CreatedEvent, which would
+// silently drop every contract but one. Returns every CreatedEvent in the
+// transaction, in order.
+export async function submitExerciseMulti(params: {
+  templateId: string;
+  contractId: string;
+  choice: string;
+  choiceArgument?: Record<string, unknown>;
+  actAs: string[];
+}): Promise<Array<{ contractId: string; createArgument: unknown }>> {
+  const { data, error } = await ledgerClient.POST("/v2/commands/submit-and-wait-for-transaction", {
+    body: {
+      commands: {
+        commandId: randomUUID(),
+        actAs: params.actAs,
+        userId: config.ledgerUserId,
+        commands: [
+          {
+            ExerciseCommand: {
+              templateId: params.templateId,
+              contractId: params.contractId,
+              choice: params.choice,
+              choiceArgument: params.choiceArgument ?? {},
+            },
+          },
+        ],
+      },
+    },
+  });
+  if (error || !data) {
+    throw new Error(`submitExerciseMulti(${params.templateId}#${params.choice}) failed: ${JSON.stringify(error)}`);
+  }
+  const results: Array<{ contractId: string; createArgument: unknown }> = [];
+  for (const e of data.transaction.events) {
+    if ("CreatedEvent" in e) {
+      results.push({ contractId: e.CreatedEvent.contractId, createArgument: e.CreatedEvent.createArgument });
+    }
+  }
+  return results;
+}
+
 // For choices that return `()` (Withdraw/Reject-style — archive with no
 // resulting contract): submitExercise's CreatedEvent lookup would throw on
 // these, since there's nothing created. Plain submit-and-wait is enough —

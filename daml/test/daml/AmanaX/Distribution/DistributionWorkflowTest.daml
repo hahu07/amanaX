@@ -1,0 +1,268 @@
+module AmanaX.Distribution.DistributionWorkflowTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Identity.Organization (OrgRole(..))
+import AmanaX.Product.Types
+import AmanaX.Product.ProductProposal
+import AmanaX.Product.ProductStructure
+import AmanaX.Review.Review
+import AmanaX.Regulatory.Regulatory
+import AmanaX.Issuance.Issuance
+import AmanaX.Investor.InvestorProfile
+import AmanaX.Subscription.Subscription
+import AmanaX.Distribution.Distribution
+import Splice.Api.Token.HoldingV1 (InstrumentId(..))
+
+-- | Milestone 7 gate: a distribution can be calculated, approved, and
+-- recorded per investor Holding. Continues on from two investors each
+-- allocated units of the same note (same setup as
+-- AmanaX.Subscription.SubscriptionWorkflowTest.subscriptionAllocationTest,
+-- doubled), then proves the resulting ProfitDistribution records are both
+-- correct *and* privacy-isolated per investor.
+distributionApprovalTest : Script ()
+distributionApprovalTest = do
+  fundManager <- allocateParty "FundManagerDistCo"
+  issuingHouse <- allocateParty "IssuingHouseDistCo"
+  shariahAdvisor <- allocateParty "ShariahAdvisorDistCo"
+  trustee <- allocateParty "TrusteeDistCo"
+  sec <- allocateParty "SECDistCo"
+  operator <- allocateParty "PlatformOperatorDistCo"
+  distributor <- allocateParty "DistributorDistCo"
+  custodian <- allocateParty "CustodianDistCo"
+  investorA <- allocateParty "InvestorADistCo"
+  investorB <- allocateParty "InvestorBDistCo"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "AmanaX Distribution Note"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      proposedType = Ijarah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 24
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Ijarah
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      structureTenorMonths = 24
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "AmanaX Distribution Note"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+
+  shariahReviewCid <- submit shariahAdvisor do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "Structure conforms to Ijarah principles."
+
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "Governance and investor-protection terms are adequate."
+
+  submissionCid <- submit issuingHouse do
+    createCmd RegulatorySubmission with
+      issuingHouse
+      sec
+      sponsor = fundManager
+      trustee
+      structureCid = finalizedCid
+      trusteeReviewCid
+      productName = "AmanaX Distribution Note"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      certificationNotes = "Structure conforms to Ijarah principles."
+      approvalNotes = "Governance and investor-protection terms are adequate."
+      documents = []
+
+  approvalCid <- submit sec do
+    exerciseCmd submissionCid RegulatorySubmission_Approve with
+      approvalReference = "SEC/AMX/2026/DIST-0001"
+
+  now <- getTime
+  let symbol = "AMXDIST"
+      parValueNGN = 1000000.0
+      totalSupply = 100000000.0 / parValueNGN
+      instrumentId = InstrumentId with admin = issuingHouse, id = symbol
+      meta = investmentNoteMetadata "AmanaX Distribution Note" symbol Ijarah totalSupply parValueNGN 24
+
+  noteCid <- submit issuingHouse do
+    createCmd InvestmentNote with
+      issuingHouse
+      operator
+      sec
+      sponsor = fundManager
+      trustee
+      approvalCid
+      instrumentId
+      symbol
+      productName = "AmanaX Distribution Note"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 100000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      parValueNGN
+      totalSupply
+      meta
+      approvalReference = "SEC/AMX/2026/DIST-0001"
+      issuedAt = now
+
+  -- Two investors onboard, get KYC-verified, subscribe, and are allocated.
+  profileACid <- submit operator do
+    createCmd InvestorProfile with
+      operator; investor = investorA; distributor
+      fullName = "Investor A"; email = "investor-a@example.com"; kycStatus = KycPending
+  _ <- submit distributor do exerciseCmd profileACid InvestorProfile_Verify
+
+  profileBCid <- submit operator do
+    createCmd InvestorProfile with
+      operator; investor = investorB; distributor
+      fullName = "Investor B"; email = "investor-b@example.com"; kycStatus = KycPending
+  _ <- submit distributor do exerciseCmd profileBCid InvestorProfile_Verify
+
+  subACid <- submit investorA do
+    createCmd SubscriptionRequest with
+      investor = investorA; distributor; issuingHouse; sponsor = fundManager
+      noteCid; instrumentId; symbol
+      productName = "AmanaX Distribution Note"
+      structureType = Ijarah; tenorMonths = 24
+      parValueNGN; targetSizeNGN = 100000000.0; minSubscriptionNGN = 1000000.0
+      amountNGN = 10000000.0
+
+  allocationACid <- submit distributor do
+    exerciseCmd subACid SubscriptionRequest_Allocate with
+      allocatedAmountNGN = 10000000.0
+      riskNotes = "Low concentration."
+
+  subBCid <- submit investorB do
+    createCmd SubscriptionRequest with
+      investor = investorB; distributor; issuingHouse; sponsor = fundManager
+      noteCid; instrumentId; symbol
+      productName = "AmanaX Distribution Note"
+      structureType = Ijarah; tenorMonths = 24
+      parValueNGN; targetSizeNGN = 100000000.0; minSubscriptionNGN = 1000000.0
+      amountNGN = 5000000.0
+
+  allocationBCid <- submit distributor do
+    exerciseCmd subBCid SubscriptionRequest_Allocate with
+      allocatedAmountNGN = 5000000.0
+      riskNotes = "Low concentration."
+
+  -- Sanity: 10 units + 5 units allocated.
+  allocA <- queryContractId investorA allocationACid
+  case allocA of
+    None -> error "expected allocation A"
+    Some a -> a.units === 10.0
+  allocB <- queryContractId investorB allocationBCid
+  case allocB of
+    None -> error "expected allocation B"
+    Some b -> b.units === 5.0
+
+  -- Step 14: Custodian proposes a ₦1,500,000 distribution, pro-rated
+  -- 10:5 -> ₦1,000,000 / ₦500,000.
+  requestCid <- submit custodian do
+    createCmd DistributionRequest with
+      custodian; trustee; issuingHouse; sponsor = fundManager
+      instrumentId; symbol
+      productName = "AmanaX Distribution Note"
+      periodLabel = "Q1 2026"
+      totalAmountNGN = 1500000.0
+      shares =
+        [ DistributionShare with investor = investorA, units = 10.0, amountNGN = 1000000.0
+        , DistributionShare with investor = investorB, units = 5.0, amountNGN = 500000.0
+        ]
+
+  -- Trustee approves; two ProfitDistribution contracts are created.
+  distributionCids <- submit trustee do
+    exerciseCmd requestCid DistributionRequest_Approve
+
+  distributionACid <- case distributionCids of
+    [a, _] -> pure a
+    other -> error ("expected exactly two distributions, got " <> show (length other))
+
+  distA <- queryContractId investorA distributionACid
+  case distA of
+    None -> error "expected investor A's distribution to exist"
+    Some d -> do
+      d.investor === investorA
+      d.amountNGN === 1000000.0
+
+  -- Privacy: investor B cannot see investor A's distribution record, and
+  -- investor A's own query returns exactly one distribution (not both).
+  aInvisibleToB <- queryContractId investorB distributionACid
+  aInvisibleToB === None
+
+  aOwnDistributions <- query @ProfitDistribution investorA
+  length aOwnDistributions === 1
+
+-- | Custodian can withdraw before Trustee decides; Trustee can reject
+-- instead of approving.
+withdrawAndRejectDistributionTest : Script ()
+withdrawAndRejectDistributionTest = do
+  custodian <- allocateParty "CustodianDistCo2"
+  trustee <- allocateParty "TrusteeDistCo2"
+  issuingHouse <- allocateParty "IssuingHouseDistCo2"
+  sponsor <- allocateParty "SponsorDistCo2"
+  investor <- allocateParty "InvestorDistCo2"
+
+  let instrumentId = InstrumentId with admin = issuingHouse, id = "AMXDIST2"
+
+  requestCid <- submit custodian do
+    createCmd DistributionRequest with
+      custodian; trustee; issuingHouse; sponsor
+      instrumentId
+      symbol = "AMXDIST2"
+      productName = "Withdrawn Distribution Note"
+      periodLabel = "Q1 2026"
+      totalAmountNGN = 200000.0
+      shares = [ DistributionShare with investor, units = 2.0, amountNGN = 200000.0 ]
+
+  submit custodian do
+    exerciseCmd requestCid DistributionRequest_Withdraw
+
+  submitMustFail trustee do
+    exerciseCmd requestCid DistributionRequest_Approve
+
+  request2Cid <- submit custodian do
+    createCmd DistributionRequest with
+      custodian; trustee; issuingHouse; sponsor
+      instrumentId
+      symbol = "AMXDIST2"
+      productName = "Rejected Distribution Note"
+      periodLabel = "Q1 2026"
+      totalAmountNGN = 200000.0
+      shares = [ DistributionShare with investor, units = 2.0, amountNGN = 200000.0 ]
+
+  submit trustee do
+    exerciseCmd request2Cid DistributionRequest_Reject with
+      rejectionReason = "Underlying asset performance not yet confirmed."

@@ -1,0 +1,96 @@
+module AmanaX.Distribution.Distribution where
+
+import Splice.Api.Token.HoldingV1 (InstrumentId)
+
+-- | Step 14 (docs/prompt.md): the Custodian calculates a profit
+-- distribution for an issued note's period (lease rental, cost-plus
+-- markup installment, etc.) and pro-rates it across every investor
+-- holding; the Trustee provides oversight by approving or rejecting
+-- before anything is recorded as paid. Same propose-accept shape as
+-- every other two-party decision point in this codebase.
+--
+-- `shares` is computed off-ledger by the backend (see
+-- backend/src/ledger/distributions.ts) from the note's live `Allocation`
+-- holdings at proposal time, the same "backend computes, ledger records"
+-- pattern already used for RegulatorySubmission's `documents` field.
+data DistributionShare = DistributionShare
+  with
+    investor : Party
+    units : Decimal
+    amountNGN : Decimal
+  deriving (Eq, Show)
+
+template DistributionRequest
+  with
+    custodian : Party
+    trustee : Party
+    issuingHouse : Party
+    sponsor : Party
+    instrumentId : InstrumentId
+    symbol : Text
+    productName : Text
+    periodLabel : Text
+    totalAmountNGN : Decimal
+    shares : [DistributionShare]
+  where
+    signatory custodian
+    observer trustee, issuingHouse, sponsor
+
+    ensure totalAmountNGN > 0.0 && not (null shares)
+
+    choice DistributionRequest_Withdraw : ()
+      controller custodian
+      do pure ()
+
+    choice DistributionRequest_Reject : ()
+      with rejectionReason : Text
+      controller trustee
+      do pure ()
+
+    -- | Creates one ProfitDistribution *per investor share*, not a single
+    -- shared contract carrying the whole cap table — deliberately, so
+    -- that an investor observer on their own record can never see any
+    -- other investor's distributed amount. Both custodian (this
+    -- contract's signatory) and trustee (this choice's controller) have
+    -- their authority available for every one of the created contracts.
+    choice DistributionRequest_Approve : [ContractId ProfitDistribution]
+      controller trustee
+      do
+        forA shares $ \s ->
+          create ProfitDistribution with
+            custodian
+            trustee
+            issuingHouse
+            sponsor
+            investor = s.investor
+            instrumentId
+            symbol
+            productName
+            periodLabel
+            units = s.units
+            amountNGN = s.amountNGN
+            totalAmountNGN
+
+-- | Step 14's terminal record — docs/prompt.md's `ProfitDistribution`
+-- template, one instance per investor `Allocation` (Holding) covered by a
+-- given distribution period, per the Milestone 7 gate: "a distribution
+-- can be calculated, approved, and recorded per investor Holding."
+template ProfitDistribution
+  with
+    custodian : Party
+    trustee : Party
+    issuingHouse : Party
+    sponsor : Party
+    investor : Party
+    instrumentId : InstrumentId
+    symbol : Text
+    productName : Text
+    periodLabel : Text
+    units : Decimal
+    amountNGN : Decimal
+    totalAmountNGN : Decimal
+  where
+    signatory custodian, trustee
+    observer investor, issuingHouse, sponsor
+
+    ensure amountNGN > 0.0

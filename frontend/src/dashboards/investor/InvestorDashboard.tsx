@@ -12,14 +12,17 @@ import { useOrganizations } from "../../hooks/useOrganizations";
 import { useInvestorProfiles } from "../../hooks/useInvestorProfiles";
 import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
 import { useSubscriptions } from "../../hooks/useSubscriptions";
+import { useProfitDistributions } from "../../hooks/useProfitDistributions";
 import type { InvestmentNote } from "../../api/investmentNotesApi";
 import type { SubscriptionItem } from "../../api/subscriptionsApi";
+import type { ProfitDistributionItem } from "../../api/distributionsApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./InvestorDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Notes", active: true, icon: <IconLayers /> },
   { label: "Subscriptions", active: true, icon: <IconFileText /> },
+  { label: "Statements", active: true, icon: <IconClipboardCheck /> },
   { label: "Reports", disabled: true, icon: <IconShield /> },
 ];
 
@@ -31,6 +34,7 @@ export default function InvestorDashboard() {
   const profiles = useInvestorProfiles(token);
   const notes = useInvestmentNotes(token);
   const subscriptions = useSubscriptions(token);
+  const statements = useProfitDistributions(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -67,7 +71,7 @@ export default function InvestorDashboard() {
     }
   }
 
-  const error = actionError ?? orgs.error ?? profiles.error ?? notes.error ?? subscriptions.error;
+  const error = actionError ?? orgs.error ?? profiles.error ?? notes.error ?? subscriptions.error ?? statements.error;
   const pendingSubs = subscriptions.data.filter((s) => s.status === "Pending");
   const holdings = subscriptions.data.filter((s) => s.status === "Allocated");
   const alreadySubscribedNoteCids = new Set(subscriptions.data.map((s) => s.noteCid));
@@ -257,6 +261,39 @@ export default function InvestorDashboard() {
             keyExtractor={(s) => s.contractId}
             emptyTitle="No holdings yet"
             emptyDescription="Allocated units will appear here once your Distributor processes a subscription."
+          />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconClipboardCheck /> My statements ({statements.data.length})
+            </span>
+          }
+          description="Profit distributions paid to you, per period — visible only to you."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (d: ProfitDistributionItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{d.productName}</span>
+                    <span className={styles.productMeta}>{d.periodLabel}</span>
+                  </div>
+                ),
+              },
+              { key: "units", header: "Units", mono: true, render: (d: ProfitDistributionItem) => d.units.toLocaleString() },
+              { key: "amount", header: "Amount", mono: true, render: (d: ProfitDistributionItem) => formatNGN(d.amountNGN) },
+            ]}
+            rows={statements.data}
+            keyExtractor={(d) => d.contractId}
+            emptyTitle="No statements yet"
+            emptyDescription="Profit distributions will appear here once your Custodian pays one out."
           />
         </CardBody>
       </Card>

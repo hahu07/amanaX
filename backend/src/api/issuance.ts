@@ -11,14 +11,15 @@ issuanceRouter.use(requireAuth);
 
 // InvestmentNote's signatory/observer set is issuingHouse, sec, sponsor,
 // trustee, operator (Milestone 6 added operator — see the module comment
-// on daml/main/daml/AmanaX/Issuance/Issuance.daml). Investor is included
-// here too, but reads via the operator's party, not its own — an Investor
-// has no stakeholder relationship to a note until it's allocated one, so
-// there's nothing to query directly as the investor.
-const NOTE_READERS = ["IssuingHouse", "SEC", "FundManager", "Issuer", "Trustee", "Investor"] as const;
+// on daml/main/daml/AmanaX/Issuance/Issuance.daml). Investor and Custodian
+// are included here too, but read via the operator's party, not their
+// own — neither has a stakeholder relationship to a note until an
+// Investor is allocated units or a Custodian proposes a distribution for
+// it (Milestone 7), so there's nothing to query directly as either party.
+const NOTE_READERS = ["IssuingHouse", "SEC", "FundManager", "Issuer", "Trustee", "Investor", "Custodian"] as const;
 
-async function readerParty(req: Request): Promise<string> {
-  if (req.auth?.role === "Investor") {
+export async function readerParty(req: Request): Promise<string> {
+  if (req.auth?.role === "Investor" || req.auth?.role === "Custodian") {
     return getOperatorParty();
   }
   return requireOrgParty(req);

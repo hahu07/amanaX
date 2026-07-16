@@ -140,11 +140,18 @@ export async function findSubscriptionById(party: string, contractId: string): P
 // mutate check, not a ledger-enforced one, same as every other
 // uniqueness/capacity guard in this codebase).
 export async function sumAllocatedNGN(issuingHouse: string, instrumentId: InstrumentId): Promise<number> {
+  const allocations = await listAllocationsForInstrument(issuingHouse, instrumentId);
+  return allocations.reduce((sum, a) => sum + a.amountNGN, 0);
+}
+
+// Milestone 7: the full list (not just the sum) of every Allocation for an
+// instrument, needed to compute each investor's pro-rata distribution
+// share. Same "queried via issuingHouse" reasoning as sumAllocatedNGN.
+export async function listAllocationsForInstrument(issuingHouse: string, instrumentId: InstrumentId): Promise<SubscriptionItem[]> {
   const contracts = await queryActiveContracts({ party: issuingHouse, templateFilterId: ALLOCATION_TEMPLATE_ID });
   return contracts
     .map((c) => toAllocated(c.contractId, c.createArgument))
-    .filter((a) => a.instrumentId.admin === instrumentId.admin && a.instrumentId.id === instrumentId.id)
-    .reduce((sum, a) => sum + a.amountNGN, 0);
+    .filter((a) => a.instrumentId.admin === instrumentId.admin && a.instrumentId.id === instrumentId.id);
 }
 
 export async function allocateSubscription(params: {
