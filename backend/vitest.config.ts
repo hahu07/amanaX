@@ -8,5 +8,13 @@ export default defineConfig({
     // allocating the stable-hint "PlatformOperator" party at once). Small
     // suite, not worth the concurrency.
     fileParallelism: false,
+    // Default timeouts (5s test / 10s hook) are too tight for tests that
+    // chain many sequential ledger round-trips (e.g. the full Shariah ->
+    // Trustee review lifecycle is 10+ commands in one test), especially
+    // against a long-running dev sandbox carrying hours of accumulated
+    // contracts. These are integration tests against a real ledger, not
+    // unit tests — generous timeouts are the right trade-off here.
+    testTimeout: 30000,
+    hookTimeout: 30000,
   },
 });

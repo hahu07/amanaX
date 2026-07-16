@@ -1,0 +1,185 @@
+module AmanaX.Review.Review where
+
+import AmanaX.Product.Types (ProductType)
+import AmanaX.Product.ProductStructure (ProductStructure)
+
+-- | All four review-stage templates live in one module, not split like
+-- Product's Types/ProductProposal/ProductStructure — ShariahReview needs
+-- ContractId TrusteeReviewRequest as a choice return type (to chain
+-- straight into Trustee review) and TrusteeReviewRequest needs
+-- ContractId ShariahReview as a field type, which would be a circular
+-- module import if split. Deal terms (productName..redemptionTerms) are
+-- copied forward from ProductStructure at each stage, same pattern
+-- ProductStructure itself uses for ProductProposal's fields — so a
+-- Shariah Advisor or Trustee can review a deal from the one contract
+-- they're an observer/signatory on, without needing separate read access
+-- to ProductStructure.
+--
+-- Step 1 (submit for Shariah review) is a plain create, not a choice on
+-- ProductStructure — ProductStructure.daml deliberately does not import
+-- this module (the reverse import, Review -> Product, is the one-way
+-- dependency this module needs for the ContractId ProductStructure field
+-- type), so it cannot host a choice returning a Review-module type. The
+-- backend only exposes that action once it has confirmed the structure is
+-- Finalized (docs/milestones/milestone-3.md records this as a deliberate
+-- backend-enforced, not ledger-enforced, sequencing rule).
+
+template ShariahReviewRequest
+  with
+    issuingHouse : Party
+    shariahAdvisor : Party
+    sponsor : Party
+    structureCid : ContractId ProductStructure
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+  where
+    signatory issuingHouse
+    observer shariahAdvisor, sponsor
+
+    choice ShariahReviewRequest_Withdraw : ()
+      controller issuingHouse
+      do pure ()
+
+    choice ShariahReviewRequest_Reject : ()
+      with rejectionReason : Text
+      controller shariahAdvisor
+      do pure ()
+
+    choice ShariahReviewRequest_Certify : ContractId ShariahReview
+      with certificationNotes : Text
+      controller shariahAdvisor
+      do
+        create ShariahReview with
+          issuingHouse
+          shariahAdvisor
+          sponsor
+          structureCid
+          productName
+          description
+          structureType
+          targetSizeNGN
+          tenorMonths
+          profitMechanism
+          minSubscriptionNGN
+          redemptionTerms
+          certificationNotes
+
+template ShariahReview
+  with
+    issuingHouse : Party
+    shariahAdvisor : Party
+    sponsor : Party
+    structureCid : ContractId ProductStructure
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    certificationNotes : Text
+  where
+    signatory issuingHouse, shariahAdvisor
+    observer sponsor
+
+    -- Step 6 can only start from a certified ShariahReview in hand — the
+    -- sequential Step 5 -> Step 6 ordering (docs/prompt.md) is enforced
+    -- structurally, not just by convention, since there is no way to
+    -- exercise this choice without one.
+    nonconsuming choice ShariahReview_SubmitForTrusteeReview : ContractId TrusteeReviewRequest
+      with trustee : Party
+      controller issuingHouse
+      do
+        create TrusteeReviewRequest with
+          issuingHouse
+          trustee
+          sponsor
+          structureCid
+          shariahReviewCid = self
+          productName
+          description
+          structureType
+          targetSizeNGN
+          tenorMonths
+          profitMechanism
+          minSubscriptionNGN
+          redemptionTerms
+          certificationNotes
+
+template TrusteeReviewRequest
+  with
+    issuingHouse : Party
+    trustee : Party
+    sponsor : Party
+    structureCid : ContractId ProductStructure
+    shariahReviewCid : ContractId ShariahReview
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    certificationNotes : Text
+  where
+    signatory issuingHouse
+    observer trustee, sponsor
+
+    choice TrusteeReviewRequest_Withdraw : ()
+      controller issuingHouse
+      do pure ()
+
+    choice TrusteeReviewRequest_Reject : ()
+      with rejectionReason : Text
+      controller trustee
+      do pure ()
+
+    choice TrusteeReviewRequest_Approve : ContractId TrusteeReview
+      with approvalNotes : Text
+      controller trustee
+      do
+        create TrusteeReview with
+          issuingHouse
+          trustee
+          sponsor
+          structureCid
+          shariahReviewCid
+          productName
+          description
+          structureType
+          targetSizeNGN
+          tenorMonths
+          profitMechanism
+          minSubscriptionNGN
+          redemptionTerms
+          certificationNotes
+          approvalNotes
+
+template TrusteeReview
+  with
+    issuingHouse : Party
+    trustee : Party
+    sponsor : Party
+    structureCid : ContractId ProductStructure
+    shariahReviewCid : ContractId ShariahReview
+    productName : Text
+    description : Text
+    structureType : ProductType
+    targetSizeNGN : Decimal
+    tenorMonths : Int
+    profitMechanism : Text
+    minSubscriptionNGN : Decimal
+    redemptionTerms : Text
+    certificationNotes : Text
+    approvalNotes : Text
+  where
+    signatory issuingHouse, trustee
+    observer sponsor

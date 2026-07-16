@@ -1,0 +1,169 @@
+module AmanaX.Review.ReviewWorkflowTest where
+
+import DA.Assert ((===))
+import Daml.Script
+import AmanaX.Identity.Organization (OrgRole(..))
+import AmanaX.Product.Types
+import AmanaX.Product.ProductProposal
+import AmanaX.Product.ProductStructure
+import AmanaX.Review.Review
+
+-- | Milestone 3 gate: a structured product can be Shariah-certified and
+-- Trustee-reviewed on-ledger. Covers Step 5-6 from docs/prompt.md end to
+-- end: submit for Shariah review -> certify -> submit for Trustee review
+-- -> approve, with the sponsor able to see both as an observer throughout.
+shariahAndTrusteeReviewTest : Script ()
+shariahAndTrusteeReviewTest = do
+  fundManager <- allocateParty "FundManagerReviewCo"
+  issuingHouse <- allocateParty "IssuingHouseReviewCo"
+  shariahAdvisor <- allocateParty "ShariahAdvisorCo"
+  trustee <- allocateParty "TrusteeCo"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      proposedType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Ijarah
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+      structureTenorMonths = 24
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  -- Step 5: submit for Shariah review (plain create — see Review.daml).
+  shariahRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "AmanaX Sukuk Note I"
+      description = "A Shariah-compliant Ijarah-backed investment note."
+      structureType = Ijarah
+      targetSizeNGN = 500000000.0
+      tenorMonths = 24
+      profitMechanism = "Lease rental distributed quarterly"
+      minSubscriptionNGN = 1000000.0
+      redemptionTerms = "Bullet redemption at maturity"
+
+  -- sponsor can see the pending request as an observer
+  sponsorView <- queryContractId fundManager shariahRequestCid
+  case sponsorView of
+    None -> error "expected sponsor to see the pending Shariah review request"
+    Some _ -> pure ()
+
+  shariahReviewCid <- submit shariahAdvisor do
+    exerciseCmd shariahRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "Structure conforms to Ijarah principles; no interest-bearing elements found."
+
+  -- the request is consumed
+  requestStillActive <- queryContractId issuingHouse shariahRequestCid
+  requestStillActive === None
+
+  -- Step 6: Issuing House chains straight into Trustee review from the
+  -- certified ShariahReview — structurally impossible to skip Step 5.
+  trusteeRequestCid <- submit issuingHouse do
+    exerciseCmd shariahReviewCid ShariahReview_SubmitForTrusteeReview with
+      trustee
+
+  trusteeReviewCid <- submit trustee do
+    exerciseCmd trusteeRequestCid TrusteeReviewRequest_Approve with
+      approvalNotes = "Governance and investor-protection terms are adequate."
+
+  finalReview <- queryContractId trustee trusteeReviewCid
+  case finalReview of
+    None -> error "expected the approved TrusteeReview to exist"
+    Some r -> do
+      r.certificationNotes === "Structure conforms to Ijarah principles; no interest-bearing elements found."
+      r.approvalNotes === "Governance and investor-protection terms are adequate."
+      r.sponsor === fundManager
+
+  -- sponsor can see the final TrusteeReview too
+  sponsorFinalView <- queryContractId fundManager trusteeReviewCid
+  case sponsorFinalView of
+    None -> error "expected sponsor to see the approved TrusteeReview"
+    Some _ -> pure ()
+
+-- | Shariah Advisor can reject; Issuing House can withdraw before either
+-- reviewer acts. Trustee review cannot be started without a certified
+-- ShariahReview in hand (structurally enforced, not just tested here).
+rejectAndWithdrawTest : Script ()
+rejectAndWithdrawTest = do
+  fundManager <- allocateParty "FundManagerReviewCo2"
+  issuingHouse <- allocateParty "IssuingHouseReviewCo2"
+  shariahAdvisor <- allocateParty "ShariahAdvisorCo2"
+
+  proposalCid <- submit fundManager do
+    createCmd ProductProposal with
+      sponsor = fundManager
+      sponsorType = FundManager
+      issuingHouse
+      productName = "Rejected Structure Note"
+      description = "Will be rejected at Shariah review."
+      proposedType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+
+  structureCid <- submit issuingHouse do
+    exerciseCmd proposalCid ProductProposal_Structure with
+      structureType = Murabahah
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+      structureTenorMonths = 6
+
+  finalizedCid <- submit issuingHouse do
+    exerciseCmd structureCid ProductStructure_Finalize
+
+  rejectedRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "Rejected Structure Note"
+      description = "Will be rejected at Shariah review."
+      structureType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+
+  submit shariahAdvisor do
+    exerciseCmd rejectedRequestCid ShariahReviewRequest_Reject with
+      rejectionReason = "Profit mechanism resembles a fixed interest payment, not a genuine cost-plus sale."
+
+  withdrawnRequestCid <- submit issuingHouse do
+    createCmd ShariahReviewRequest with
+      issuingHouse
+      shariahAdvisor
+      sponsor = fundManager
+      structureCid = finalizedCid
+      productName = "Withdrawn Review"
+      description = "Will be withdrawn."
+      structureType = Murabahah
+      targetSizeNGN = 100000.0
+      tenorMonths = 6
+      profitMechanism = "Fixed markup"
+      minSubscriptionNGN = 10000.0
+      redemptionTerms = "Bullet"
+
+  submit issuingHouse do
+    exerciseCmd withdrawnRequestCid ShariahReviewRequest_Withdraw
+
+  -- Shariah Advisor cannot certify a request that was already withdrawn
+  submitMustFail shariahAdvisor do
+    exerciseCmd withdrawnRequestCid ShariahReviewRequest_Certify with
+      certificationNotes = "should fail"

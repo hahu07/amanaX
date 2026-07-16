@@ -168,6 +168,11 @@ export async function listStructures(party: string): Promise<ProductStructure[]>
   return contracts.map((c) => toStructure(c.contractId, c.createArgument));
 }
 
+export async function findStructureById(party: string, contractId: string): Promise<ProductStructure | undefined> {
+  const structures = await listStructures(party);
+  return structures.find((s) => s.contractId === contractId);
+}
+
 export async function updateStructureTerms(params: {
   issuingHouse: string;
   contractId: string;

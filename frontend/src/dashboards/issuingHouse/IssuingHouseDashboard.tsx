@@ -11,13 +11,17 @@ import { useAuth } from "../../auth/AuthContext";
 import { useOrganizations } from "../../hooks/useOrganizations";
 import { useProposals } from "../../hooks/useProposals";
 import { useStructures } from "../../hooks/useStructures";
+import { useShariahReviews } from "../../hooks/useShariahReviews";
+import { useTrusteeReviews } from "../../hooks/useTrusteeReviews";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType, type StructuringRecommendation } from "../../api/productsApi";
+import type { ComplianceAssessment, ShariahReviewItem, TrusteeReviewItem } from "../../api/reviewsApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./IssuingHouseDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Proposals", active: true, icon: <IconFileText /> },
   { label: "Structures", active: true, icon: <IconLayers /> },
+  { label: "Reviews", active: true, icon: <IconClipboardCheck /> },
   { label: "Reports", disabled: true, icon: <IconShield /> },
 ];
 
@@ -46,9 +50,13 @@ export default function IssuingHouseDashboard() {
   const orgs = useOrganizations(token);
   const proposals = useProposals(token);
   const structures = useStructures(token);
+  const shariahReviews = useShariahReviews(token);
+  const trusteeReviews = useTrusteeReviews(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
+  const shariahAdvisors = orgs.data.filter((o) => o.role === "ShariahAdvisor" && o.active);
+  const trustees = orgs.data.filter((o) => o.role === "Trustee" && o.active);
 
   // --- Proposal review (AI recommendation + initial structuring) ---
   const [reviewingId, setReviewingId] = useState<string | null>(null);
@@ -170,9 +178,80 @@ export default function IssuingHouseDashboard() {
     }
   }
 
-  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error;
+  // --- Step 5: submit a Finalized structure for Shariah review ---
+  const [submittingShariahFor, setSubmittingShariahFor] = useState<string | null>(null);
+  const [shariahAdvisorParty, setShariahAdvisorParty] = useState("");
+
+  function openSubmitShariah(structure: ProductStructure) {
+    setActionError(null);
+    setSubmittingShariahFor(submittingShariahFor === structure.contractId ? null : structure.contractId);
+    setShariahAdvisorParty("");
+  }
+
+  async function handleSubmitShariahReview(e: FormEvent, structure: ProductStructure) {
+    e.preventDefault();
+    setActionError(null);
+    try {
+      await shariahReviews.submit(structure.contractId, shariahAdvisorParty);
+      setSubmittingShariahFor(null);
+    } catch {
+      setActionError("Could not submit this structure for Shariah review.");
+    }
+  }
+
+  // --- Step 6: submit a Certified Shariah review for Trustee review ---
+  const [submittingTrusteeFor, setSubmittingTrusteeFor] = useState<string | null>(null);
+  const [trusteeParty, setTrusteeParty] = useState("");
+
+  function openSubmitTrustee(review: ShariahReviewItem) {
+    setActionError(null);
+    setSubmittingTrusteeFor(submittingTrusteeFor === review.contractId ? null : review.contractId);
+    setTrusteeParty("");
+  }
+
+  async function handleSubmitTrusteeReview(e: FormEvent, review: ShariahReviewItem) {
+    e.preventDefault();
+    setActionError(null);
+    try {
+      await shariahReviews.submitTrusteeReview(review.contractId, trusteeParty);
+      await trusteeReviews.refresh();
+      setSubmittingTrusteeFor(null);
+    } catch {
+      setActionError("Could not submit this review for Trustee review.");
+    }
+  }
+
+  // --- Step 7: AI Compliance Agent, previewing SEC-submission readiness ---
+  const [complianceId, setComplianceId] = useState<string | null>(null);
+  const [complianceLoading, setComplianceLoading] = useState(false);
+  const [compliance, setCompliance] = useState<ComplianceAssessment | null>(null);
+
+  async function handleCheckCompliance(review: TrusteeReviewItem) {
+    setActionError(null);
+    if (complianceId === review.contractId) {
+      setComplianceId(null);
+      return;
+    }
+    setComplianceId(review.contractId);
+    setCompliance(null);
+    setComplianceLoading(true);
+    try {
+      const res = await trusteeReviews.checkCompliance(review.contractId);
+      setCompliance(res.output);
+    } catch {
+      setActionError("Could not reach the Compliance Agent.");
+    } finally {
+      setComplianceLoading(false);
+    }
+  }
+
+  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error ?? shariahReviews.error ?? trusteeReviews.error;
   const draftStructures = structures.data.filter((s) => s.status === "ProductStructure_Draft");
   const finalizedStructures = structures.data.filter((s) => s.status === "ProductStructure_Finalized");
+  const pendingShariahReviews = shariahReviews.data.filter((r) => r.status === "Pending");
+  const certifiedShariahReviews = shariahReviews.data.filter((r) => r.status === "Certified");
+  const pendingTrusteeReviews = trusteeReviews.data.filter((r) => r.status === "Pending");
+  const approvedTrusteeReviews = trusteeReviews.data.filter((r) => r.status === "Approved");
 
   function renderStructureForm(proposal: ProductProposal) {
     if (!form) return null;
@@ -370,12 +449,24 @@ export default function IssuingHouseDashboard() {
       key: "actions",
       header: "",
       align: "right",
-      render: (s) =>
-        s.status === "ProductStructure_Draft" ? (
-          <Button size="sm" variant={editingId === s.contractId ? "secondary" : "primary"} onClick={() => openEdit(s)}>
-            {editingId === s.contractId ? "Close" : "Edit / finalize"}
+      render: (s) => {
+        if (s.status === "ProductStructure_Draft") {
+          return (
+            <Button size="sm" variant={editingId === s.contractId ? "secondary" : "primary"} onClick={() => openEdit(s)}>
+              {editingId === s.contractId ? "Close" : "Edit / finalize"}
+            </Button>
+          );
+        }
+        const alreadySubmitted = shariahReviews.data.some((r) => r.structureCid === s.contractId);
+        if (alreadySubmitted) {
+          return <StatusBadge tone="outline">Submitted for review</StatusBadge>;
+        }
+        return (
+          <Button size="sm" variant={submittingShariahFor === s.contractId ? "secondary" : "primary"} onClick={() => openSubmitShariah(s)}>
+            {submittingShariahFor === s.contractId ? "Close" : "Submit for Shariah review"}
           </Button>
-        ) : null,
+        );
+      },
     },
   ];
 
@@ -490,6 +581,228 @@ export default function IssuingHouseDashboard() {
           if (!structure) return null;
           return <div className={styles.reviewPanel}>{renderEditForm(structure)}</div>;
         })()}
+        {submittingShariahFor && (() => {
+          const structure = structures.data.find((s) => s.contractId === submittingShariahFor);
+          if (!structure) return null;
+          return (
+            <div className={styles.reviewPanel}>
+              <form className={styles.form} onSubmit={(e) => handleSubmitShariahReview(e, structure)}>
+                <div className={styles.field}>
+                  <label htmlFor="shariahAdvisorParty">Shariah Advisor</label>
+                  <select
+                    id="shariahAdvisorParty"
+                    required
+                    value={shariahAdvisorParty}
+                    onChange={(e) => setShariahAdvisorParty(e.target.value)}
+                  >
+                    <option value="" disabled>
+                      Select…
+                    </option>
+                    {shariahAdvisors.map((org) => (
+                      <option key={org.contractId} value={org.party}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formActions}>
+                  <Button type="submit" variant="primary" disabled={shariahAdvisors.length === 0}>
+                    Submit for review
+                  </Button>
+                </div>
+              </form>
+              {shariahAdvisors.length === 0 && (
+                <Alert tone="neutral">No active Shariah Advisor is onboarded yet — ask the Platform Operator to add one.</Alert>
+              )}
+            </div>
+          );
+        })()}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconClipboardCheck /> Shariah reviews ({shariahReviews.data.length})
+            </span>
+          }
+          description="Structures submitted for Shariah certification."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (r: ShariahReviewItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{r.productName}</span>
+                    <span className={styles.productMeta}>with {orgName(r.shariahAdvisor)}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (r: ShariahReviewItem) => (
+                  <StatusBadge tone={r.status === "Certified" ? "success" : "warning"}>{r.status}</StatusBadge>
+                ),
+              },
+              {
+                key: "actions",
+                header: "",
+                align: "right",
+                render: (r: ShariahReviewItem) => {
+                  if (r.status !== "Certified") return null;
+                  const alreadySubmitted = trusteeReviews.data.some((t) => t.shariahReviewCid === r.contractId);
+                  if (alreadySubmitted) {
+                    return <StatusBadge tone="outline">Submitted for review</StatusBadge>;
+                  }
+                  return (
+                    <Button size="sm" variant={submittingTrusteeFor === r.contractId ? "secondary" : "primary"} onClick={() => openSubmitTrustee(r)}>
+                      {submittingTrusteeFor === r.contractId ? "Close" : "Submit for Trustee review"}
+                    </Button>
+                  );
+                },
+              },
+            ]}
+            rows={[...pendingShariahReviews, ...certifiedShariahReviews]}
+            keyExtractor={(r) => r.contractId}
+            emptyTitle="No Shariah reviews yet"
+            emptyDescription="Submit a Finalized structure above to see it here."
+          />
+        </CardBody>
+        {submittingTrusteeFor && (() => {
+          const review = certifiedShariahReviews.find((r) => r.contractId === submittingTrusteeFor);
+          if (!review) return null;
+          return (
+            <div className={styles.reviewPanel}>
+              <form className={styles.form} onSubmit={(e) => handleSubmitTrusteeReview(e, review)}>
+                <div className={styles.field}>
+                  <label htmlFor="trusteeParty">Trustee</label>
+                  <select id="trusteeParty" required value={trusteeParty} onChange={(e) => setTrusteeParty(e.target.value)}>
+                    <option value="" disabled>
+                      Select…
+                    </option>
+                    {trustees.map((org) => (
+                      <option key={org.contractId} value={org.party}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formActions}>
+                  <Button type="submit" variant="primary" disabled={trustees.length === 0}>
+                    Submit for review
+                  </Button>
+                </div>
+              </form>
+              {trustees.length === 0 && <Alert tone="neutral">No active Trustee is onboarded yet — ask the Platform Operator to add one.</Alert>}
+            </div>
+          );
+        })()}
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconShield /> Trustee reviews ({trusteeReviews.data.length})
+            </span>
+          }
+          description="Structures submitted for Trustee approval."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (r: TrusteeReviewItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{r.productName}</span>
+                    <span className={styles.productMeta}>with {orgName(r.trustee)}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (r: TrusteeReviewItem) => (
+                  <StatusBadge tone={r.status === "Approved" ? "success" : "warning"}>{r.status}</StatusBadge>
+                ),
+              },
+              {
+                key: "actions",
+                header: "",
+                align: "right",
+                render: (r: TrusteeReviewItem) =>
+                  r.status === "Approved" ? (
+                    <Button size="sm" variant={complianceId === r.contractId ? "secondary" : "primary"} onClick={() => handleCheckCompliance(r)}>
+                      {complianceId === r.contractId ? "Close" : "Check compliance"}
+                    </Button>
+                  ) : null,
+              },
+            ]}
+            rows={[...pendingTrusteeReviews, ...approvedTrusteeReviews]}
+            keyExtractor={(r) => r.contractId}
+            emptyTitle="No Trustee reviews yet"
+            emptyDescription="Submit a certified Shariah review above to see it here."
+          />
+        </CardBody>
+        {complianceId && (
+          <div className={styles.reviewPanel}>
+            <div className={styles.compliancePanel}>
+              <div className={styles.complianceHead}>
+                <span className={styles.complianceTitle}>
+                  <IconClipboardCheck /> AI Compliance Agent
+                </span>
+                {compliance && (
+                  <StatusBadge tone={compliance.readyForSubmission ? "success" : "warning"}>
+                    {compliance.readyForSubmission ? "Ready for submission" : "Not yet ready"}
+                  </StatusBadge>
+                )}
+              </div>
+              {complianceLoading && <p className={styles.complianceEmpty}>Consulting the assistant…</p>}
+              {compliance && (
+                <>
+                  <div className={styles.complianceSection}>
+                    <div className={styles.complianceSectionLabel}>Workflow gaps</div>
+                    {compliance.workflowGaps.length === 0 ? (
+                      <p className={styles.complianceEmpty}>None.</p>
+                    ) : (
+                      <ul className={styles.complianceList}>
+                        {compliance.workflowGaps.map((g) => (
+                          <li key={g}>{g}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className={styles.complianceSection}>
+                    <div className={styles.complianceSectionLabel}>Shariah checklist gaps</div>
+                    {compliance.shariahChecklistGaps.length === 0 ? (
+                      <p className={styles.complianceEmpty}>None.</p>
+                    ) : (
+                      <ul className={styles.complianceList}>
+                        {compliance.shariahChecklistGaps.map((g) => (
+                          <li key={g}>{g}</li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className={styles.complianceSection}>
+                    <div className={styles.complianceSectionLabel}>Documents still needed for SEC filing</div>
+                    <ul className={styles.complianceList}>
+                      {compliance.missingDocuments.map((d) => (
+                        <li key={d}>{d}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
     </AppShell>
   );

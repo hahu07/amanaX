@@ -27,7 +27,7 @@ async function productStructuringNode(state: AssistantStateType): Promise<Partia
 
 async function complianceNode(state: AssistantStateType): Promise<Partial<AssistantStateType>> {
   const output = await runComplianceAgent(state.context);
-  return { result: { agent: "compliance", output, model: "stub-milestone-0", timestamp: new Date().toISOString() } };
+  return { result: { agent: "compliance", output, model: "rule-based-v1", timestamp: new Date().toISOString() } };
 }
 
 async function documentationNode(state: AssistantStateType): Promise<Partial<AssistantStateType>> {

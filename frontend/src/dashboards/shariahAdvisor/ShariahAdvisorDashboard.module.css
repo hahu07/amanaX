@@ -1,6 +1,6 @@
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-4);
 }
 
@@ -52,11 +52,11 @@
 }
 
 .productMeta {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
   font-size: var(--text-xs);
   color: var(--text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .rowActions {
@@ -65,8 +65,6 @@
   justify-content: flex-end;
 }
 
-/* Review panel: AI recommendation + the structuring/edit form, revealed
-   inline under a proposal or structure row. */
 .reviewPanel {
   border-top: 1px solid var(--color-border);
   background: var(--color-surface-sunken);
@@ -85,46 +83,34 @@
   }
 }
 
-.recommendation {
-  border: 1px solid var(--accent-border);
-  background: var(--accent-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+.dealSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3) var(--space-5);
   margin-bottom: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--color-border);
 }
 
-.recommendationHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-2);
-}
-
-.recommendationTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
+.dealSummaryLabel {
+  font-size: var(--text-xs);
   font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+.dealSummaryValue {
+  margin-top: 2px;
+  font-size: var(--text-sm);
   color: var(--text-primary);
 }
 
-.recommendationRationale {
+.dealSummaryValueMono {
+  margin-top: 2px;
+  font-family: var(--font-mono);
   font-size: var(--text-sm);
-  color: var(--text-secondary);
-  margin-bottom: var(--space-3);
-}
-
-.recommendationGaps {
-  margin: var(--space-2) 0 var(--space-3);
-  padding-left: var(--space-5);
-  font-size: var(--text-sm);
-  color: var(--text-secondary);
-}
-
-.recommendationGaps li {
-  margin-bottom: var(--space-1);
+  color: var(--text-primary);
 }
 
 .form {
@@ -152,32 +138,18 @@
   color: var(--text-secondary);
 }
 
-.field input,
-.field select,
 .field textarea {
-  padding: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border-strong);
   background: var(--color-surface);
   color: var(--text-primary);
   font-size: var(--text-sm);
   font-family: inherit;
-}
-
-.field input,
-.field select {
-  height: 36px;
-}
-
-.field textarea {
-  padding-top: var(--space-2);
-  padding-bottom: var(--space-2);
   resize: vertical;
-  min-height: 56px;
+  min-height: 64px;
 }
 
-.field input:focus-visible,
-.field select:focus-visible,
 .field textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -1px;
@@ -191,58 +163,8 @@
   margin-top: var(--space-4);
 }
 
-.compliancePanel {
-  border: 1px solid var(--accent-border);
-  background: var(--accent-bg);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-}
-
-.complianceHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-  margin-bottom: var(--space-3);
-}
-
-.complianceTitle {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.complianceSection {
-  margin-bottom: var(--space-3);
-}
-
-.complianceSection:last-child {
-  margin-bottom: 0;
-}
-
-.complianceSectionLabel {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--text-tertiary);
-  margin-bottom: var(--space-2);
-}
-
-.complianceList {
-  padding-left: var(--space-5);
+.notesCell {
   font-size: var(--text-sm);
   color: var(--text-secondary);
-}
-
-.complianceList li {
-  margin-bottom: var(--space-1);
-}
-
-.complianceEmpty {
-  font-size: var(--text-sm);
-  color: var(--text-tertiary);
+  max-width: 320px;
 }

@@ -6,6 +6,7 @@ import { authRouter } from "./api/auth.js";
 import { orgsRouter } from "./api/orgs.js";
 import { proposalsRouter } from "./api/proposals.js";
 import { structuresRouter } from "./api/structures.js";
+import { reviewsRouter } from "./api/reviews.js";
 
 export const app = express();
 app.use(cors());
@@ -15,6 +16,7 @@ app.use(authRouter);
 app.use(orgsRouter);
 app.use(proposalsRouter);
 app.use(structuresRouter);
+app.use(reviewsRouter);
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(config.port, () => {
