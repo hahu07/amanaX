@@ -11,7 +11,15 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production below (needed at runtime — see
+    # backend/agents config.ts equivalents) also reaches `npm ci` during the
+    # build step, where it makes npm skip devDependencies entirely —
+    # including @types/node, @types/express, and typescript itself, which
+    # this build needs. Confirmed empirically: this is exactly what broke
+    # the first Render deploy (TS7006/TS2591 errors for `process`, `console`,
+    # `fetch`, Express types — every one of them a missing @types package,
+    # not a real type error).
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
@@ -55,7 +63,15 @@ services:
     runtime: node
     plan: free
     rootDir: agents
-    buildCommand: npm ci && npm run build
+    # --include=dev: NODE_ENV=production below (needed at runtime — see
+    # backend/agents config.ts equivalents) also reaches `npm ci` during the
+    # build step, where it makes npm skip devDependencies entirely —
+    # including @types/node, @types/express, and typescript itself, which
+    # this build needs. Confirmed empirically: this is exactly what broke
+    # the first Render deploy (TS7006/TS2591 errors for `process`, `console`,
+    # `fetch`, Express types — every one of them a missing @types package,
+    # not a real type error).
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm start
     healthCheckPath: /health
     envVars:
