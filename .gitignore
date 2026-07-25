@@ -10,6 +10,9 @@ dist/
 .env
 .env.local
 
+# Internal project docs — not meant for the public repo
+docs/
+
 # Editor/OS
 .DS_Store
 
