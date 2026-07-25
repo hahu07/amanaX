@@ -8,6 +8,25 @@ import { Button } from "../components/Button";
 import { Alert } from "../components/Alert";
 import styles from "./LoginPage.module.css";
 
+// Every account seeded on this demo's ledger — see backend/scripts/seed-devnet.ts
+// (or the local walkthrough's own Operator-dashboard onboarding). Dev login has
+// no password by design (see the subhead note below), so there's nothing sensitive
+// in listing these: they only work against this specific demo dataset, and a judge
+// with no prior context otherwise has no way to discover which email maps to
+// which role.
+const DEMO_ACCOUNTS: { role: string; email: string }[] = [
+  { role: "Platform Operator", email: "operator@amanax.dev" },
+  { role: "Issuer", email: "rid@amana.ng" },
+  { role: "Fund Manager", email: "fm@amana.ng" },
+  { role: "Issuing House", email: "ade@amanafin.ng" },
+  { role: "Shariah Advisor", email: "advisor@amanashariah.ng" },
+  { role: "Trustee", email: "trustee@amanatrustee.ng" },
+  { role: "SEC", email: "reviewer@sec.gov.ng" },
+  { role: "Custodian", email: "custodian@amanacustody.ng" },
+  { role: "Distributor", email: "distributor@amanadist.ng" },
+  { role: "Investor", email: "yusuf.garba@investor.ng" },
+];
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -15,12 +34,11 @@ export default function LoginPage() {
   const { setAuth } = useAuth();
   const navigate = useNavigate();
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
+  async function doLogin(emailValue: string) {
     setError(null);
     setSubmitting(true);
     try {
-      const auth = await login(email);
+      const auth = await login(emailValue);
       setAuth(auth);
       navigate(`/dashboard/${ROLE_ROUTE[auth.role]}`);
     } catch (err) {
@@ -32,6 +50,11 @@ export default function LoginPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    await doLogin(email);
   }
 
   return (
@@ -68,6 +91,24 @@ export default function LoginPage() {
 
         <div className={styles.footerLink}>
           <Link to="/">← Back to AmanaX</Link> · <Link to="/investor-signup">New investor? Create an account</Link>
+        </div>
+
+        <div className={styles.demoAccounts}>
+          <p className={styles.demoAccountsLabel}>Demo accounts — click to sign in as that role</p>
+          <div className={styles.demoAccountsList}>
+            {DEMO_ACCOUNTS.map((account) => (
+              <button
+                key={account.email}
+                type="button"
+                className={styles.demoAccountRow}
+                disabled={submitting}
+                onClick={() => doLogin(account.email)}
+              >
+                <span className={styles.demoAccountRole}>{account.role}</span>
+                <span className={styles.demoAccountEmail}>{account.email}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </main>
