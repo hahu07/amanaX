@@ -93,7 +93,17 @@ export type RiskAssessment = z.infer<typeof RiskAssessmentSchema>;
 // fields (productName, symbol, ...) are simply absent for the
 // portfolio-wide investor report. Same "backend assembles context, agent
 // never touches the ledger" pattern as DealContext.
-export const ReportTypeSchema = z.enum(["management", "investor", "compliance", "regulatory"]);
+//
+// Milestone 9 (post-hardening pass) — four more report kinds, one per
+// remaining role whose dashboard shipped with a disabled "Reports" tab:
+// "portfolio" (Distributor: their book of investors and allocations),
+// "custody" (Custodian: notes and distributions they administer),
+// "shariah" (Shariah Advisor: their certification history), "platform"
+// (Platform Operator: network-wide org/user counts). Each is scoped by
+// the caller's own party the same way management/investor/regulatory
+// already are — the backend assembles the context from whatever ledger
+// reads that party is naturally a stakeholder on; no new privacy surface.
+export const ReportTypeSchema = z.enum(["management", "investor", "compliance", "regulatory", "portfolio", "custody", "shariah", "platform"]);
 export type ReportType = z.infer<typeof ReportTypeSchema>;
 
 export const ReportContextSchema = z.object({
@@ -111,6 +121,16 @@ export const ReportContextSchema = z.object({
   compliance: ComplianceAssessmentSchema.nullable().optional(),
   holdings: z.array(z.record(z.unknown())).default([]),
   distributions: z.array(z.record(z.unknown())).default([]),
+  // "portfolio" (Distributor's own investor profiles)
+  investorProfiles: z.array(z.record(z.unknown())).default([]),
+  // "custody" (Custodian's own issued notes + distribution requests)
+  investmentNotes: z.array(z.record(z.unknown())).default([]),
+  distributionRequests: z.array(z.record(z.unknown())).default([]),
+  // "shariah" (Shariah Advisor's own review history)
+  shariahReviews: z.array(z.record(z.unknown())).default([]),
+  // "platform" (Operator's network-wide view)
+  organizations: z.array(z.record(z.unknown())).default([]),
+  users: z.array(z.record(z.unknown())).default([]),
 });
 export type ReportContext = z.infer<typeof ReportContextSchema>;
 

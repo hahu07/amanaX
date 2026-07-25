@@ -24,7 +24,11 @@ export default function LoginPage() {
       setAuth(auth);
       navigate(`/dashboard/${ROLE_ROUTE[auth.role]}`);
     } catch (err) {
-      setError(err instanceof ApiError ? "No active user found for this email." : "Could not reach the backend.");
+      if (err instanceof ApiError) {
+        setError(err.status === 401 ? "No active user found for this email." : "Something went wrong signing you in. Try again in a moment.");
+      } else {
+        setError("Could not reach the backend.");
+      }
     } finally {
       setSubmitting(false);
     }

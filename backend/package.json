@@ -8,13 +8,15 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "test": "vitest run",
-    "gen:ledger-client": "openapi-typescript http://localhost:7575/docs/openapi -o src/ledger/schema.d.ts"
+    "gen:ledger-client": "openapi-typescript http://localhost:7575/docs/openapi -o src/ledger/schema.d.ts",
+    "e2e:timed": "tsx scripts/e2e-timed.ts"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
     "express-async-errors": "^3.1.1",
+    "express-rate-limit": "^8.6.0",
     "jsonwebtoken": "^9.0.2",
     "openapi-fetch": "^0.13.4",
     "zod": "^3.24.1"

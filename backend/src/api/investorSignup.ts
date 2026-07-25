@@ -1,4 +1,5 @@
 import { Router } from "express";
+import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { getOperatorParty } from "../ledger/operator.js";
 import { listOrganizations } from "../ledger/organizations.js";
@@ -27,7 +28,17 @@ const signupSchema = z.object({
   distributor: z.string().min(1),
 });
 
-investorSignupRouter.post("/investor-signup", async (req, res) => {
+// Same rate-limiting rationale as /auth/login (see auth.ts's
+// loginRateLimit comment) — this is the other genuinely public write.
+const signupRateLimit = rateLimit({
+  windowMs: 60_000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === "test",
+});
+
+investorSignupRouter.post("/investor-signup", signupRateLimit, async (req, res) => {
   const parsed = signupSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.flatten() });

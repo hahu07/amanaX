@@ -1,0 +1,86 @@
+# Render Blueprint — deploys all three services (frontend, backend, agents)
+# from this one repo in a single "New Blueprint" action. See docs/deployment.md
+# for what each env var means and which ones are secrets you set by hand in
+# the Render dashboard (marked `sync: false` below) rather than committing here.
+#
+# Free-tier web services spin down after 15 min idle and cold-start on the
+# next request (~30-60s) — fine for hackathon judging, not for a real SLA.
+services:
+  - type: web
+    name: amanax-backend
+    runtime: node
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DAML_PACKAGE_NAME
+        value: amanax-main
+      # DevNet participant this app is currently vetted against — see
+      # docs/deployment.md's "Promoting past LocalNet" section.
+      - key: LEDGER_API_URL
+        value: https://ledger-api-json.participant.hackcanton-01.devnet.naas.noders.services
+      - key: LEDGER_USER_ID
+        sync: false # the ledger-api user id tied to your DevNet OIDC account
+      - key: OPERATOR_PARTY
+        sync: false # PlatformOperator::<namespace> — see backend/scripts/seed-devnet.ts
+      # Unattended refresh-token flow — see ledger/tokenRefresh.ts. Seed the
+      # refresh token once by hand (password-grant curl in docs/deployment.md);
+      # access tokens are refreshed in-process indefinitely from then on, no
+      # redeploys needed as it expires.
+      - key: LEDGER_OIDC_TOKEN_URL
+        value: https://keycloak.naas.noders.services/realms/noders-appsfactory/protocol/openid-connect/token
+      - key: LEDGER_OIDC_CLIENT_ID
+        value: web-app-ui-hackcanton-01-devnet
+      - key: LEDGER_OIDC_REFRESH_TOKEN
+        sync: false # seed once from the password-grant curl in docs/deployment.md
+      - key: JWT_SECRET
+        generateValue: true # config.ts refuses to boot in production without a real one
+      - key: OPERATOR_EMAIL
+        value: operator@amanax.dev
+      - key: AGENTS_SERVICE_URL
+        value: https://amanax-agents.onrender.com
+      - key: AGENTS_SHARED_SECRET
+        generateValue: true
+      - key: ALLOWED_ORIGIN
+        value: https://amanax-frontend.onrender.com
+
+  - type: web
+    name: amanax-agents
+    runtime: node
+    plan: free
+    rootDir: agents
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4100
+      - key: AGENTS_SHARED_SECRET
+        fromService:
+          name: amanax-backend
+          type: web
+          envVarKey: AGENTS_SHARED_SECRET
+
+  - type: web
+    name: amanax-frontend
+    runtime: static
+    plan: free
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_BACKEND_URL
+        value: https://amanax-backend.onrender.com
+    routes:
+      # SPA fallback — React Router needs every path to resolve to index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html

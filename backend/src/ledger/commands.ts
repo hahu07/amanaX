@@ -6,6 +6,19 @@ export function templateId(module: string, entity: string): string {
   return `#${config.packageName}:${module}:${entity}`;
 }
 
+// Sandbox has no ledger-API auth, so there's no JWT to derive a user from —
+// every command carries the same fixed `LEDGER_USER_ID`. A JWT-authenticated
+// participant (DevNet/TestNet/production) derives the ledger-api user from
+// the token itself and rejects a command that names a different one
+// explicitly (confirmed empirically against hackcanton-01: an explicit
+// `userId` not matching the JWT's own user produced a bare PERMISSION_DENIED
+// with no further detail, even though `actAs` was for a party this backend
+// genuinely has rights to act as) — so omit the field entirely once a token
+// is configured.
+function commandUserId(): { userId: string } | Record<string, never> {
+  return config.ledgerApiToken ? {} : { userId: config.ledgerUserId };
+}
+
 // Party hints must be unique on the participant, so a plain "allocate with
 // this hint" call collides on any retry with the same name (e.g. two orgs
 // sanitizing to the same hint). A short random suffix keeps this call
@@ -56,7 +69,7 @@ export async function submitCreate(params: {
       commands: {
         commandId: randomUUID(),
         actAs: params.actAs,
-        userId: config.ledgerUserId,
+        ...commandUserId(),
         commands: [
           {
             CreateCommand: {
@@ -90,7 +103,7 @@ export async function submitExercise(params: {
       commands: {
         commandId: randomUUID(),
         actAs: params.actAs,
-        userId: config.ledgerUserId,
+        ...commandUserId(),
         commands: [
           {
             ExerciseCommand: {
@@ -131,7 +144,7 @@ export async function submitExerciseMulti(params: {
       commands: {
         commandId: randomUUID(),
         actAs: params.actAs,
-        userId: config.ledgerUserId,
+        ...commandUserId(),
         commands: [
           {
             ExerciseCommand: {
@@ -172,7 +185,7 @@ export async function submitExerciseVoid(params: {
     body: {
       commandId: randomUUID(),
       actAs: params.actAs,
-      userId: config.ledgerUserId,
+      ...commandUserId(),
       commands: [
         {
           ExerciseCommand: {

@@ -8,6 +8,12 @@ function context(overrides: Partial<ReportContext>): ReportContext {
     dealId: "deal-1",
     holdings: [],
     distributions: [],
+    investorProfiles: [],
+    investmentNotes: [],
+    distributionRequests: [],
+    shariahReviews: [],
+    organizations: [],
+    users: [],
     ...overrides,
   };
 }
@@ -91,5 +97,74 @@ describe("runReportingAgent", () => {
     const result = await runReportingAgent(context({ reportType: "management" }));
     expect(result.markdown).toContain("Untitled Product");
     expect(result.markdown).toContain("TBD");
+  });
+
+  it("generates a distributor portfolio report with KYC breakdown", async () => {
+    const result = await runReportingAgent(
+      context({
+        reportType: "portfolio",
+        generatedFor: "Amana Distribution Partners",
+        investorProfiles: [
+          { fullName: "Yusuf Garba", email: "yusuf.garba@investor.ng", kycStatus: "KycVerified" },
+          { fullName: "Bola Ahmed", email: "bola@investor.ng", kycStatus: "KycPending" },
+        ],
+        holdings: [{ investor: "yusuf", units: 5000, amountNGN: 5_000_000 }],
+      }),
+    );
+    expect(result.reportType).toBe("portfolio");
+    expect(result.markdown).toContain("Yusuf Garba");
+    expect(result.markdown).toContain("KYC verified | 1");
+    expect(result.markdown).toContain("KYC pending | 1");
+    expect(result.markdown).toContain("₦5,000,000.00");
+  });
+
+  it("generates a custodian report reflecting notes and distributions administered", async () => {
+    const result = await runReportingAgent(
+      context({
+        reportType: "custody",
+        generatedFor: "Amana Custody Bank",
+        investmentNotes: [{ productName: "AmanaX Sukuk Note I", symbol: "AMXSNI", totalSupply: 500000 }],
+        distributionRequests: [{ periodLabel: "Q2 2026" }],
+        distributions: [{ amountNGN: 1_500_000 }],
+      }),
+    );
+    expect(result.reportType).toBe("custody");
+    expect(result.markdown).toContain("AmanaX Sukuk Note I");
+    expect(result.markdown).toContain("Distribution requests pending Trustee approval | 1");
+    expect(result.markdown).toContain("₦1,500,000.00");
+  });
+
+  it("generates a shariah advisor report summarizing certification history", async () => {
+    const result = await runReportingAgent(
+      context({
+        reportType: "shariah",
+        generatedFor: "Amana Shariah Board",
+        shariahReviews: [
+          { productName: "AmanaX Sukuk Note I", structureType: "Wakalah", status: "Certified", certificationNotes: "Certified compliant." },
+          { productName: "AmanaX Note II", structureType: "Ijarah", status: "Pending" },
+        ],
+      }),
+    );
+    expect(result.reportType).toBe("shariah");
+    expect(result.markdown).toContain("Certified compliant | 1");
+    expect(result.markdown).toContain("Pending certification | 1");
+    expect(result.markdown).toContain("Certified compliant.");
+  });
+
+  it("generates a platform report summarizing organizations and users", async () => {
+    const result = await runReportingAgent(
+      context({
+        reportType: "platform",
+        organizations: [
+          { name: "Amana Trading Ltd", role: "Issuer", active: true },
+          { name: "Amana Finance Ltd", role: "IssuingHouse", active: true },
+        ],
+        users: [{ email: "rid@amana.ng" }, { email: "ade@amanafin.ng" }],
+      }),
+    );
+    expect(result.reportType).toBe("platform");
+    expect(result.markdown).toContain("Organizations onboarded | 2");
+    expect(result.markdown).toContain("Users onboarded | 2");
+    expect(result.markdown).toContain("| Issuer | 1 |");
   });
 });

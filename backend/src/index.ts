@@ -1,3 +1,11 @@
+// Must be the very first import: config.js reads process.env at module-load
+// time, so `.env` has to be populated before anything else executes. `dotenv`
+// has been a listed dependency since Milestone 0 but was never actually
+// invoked anywhere — every prior milestone's local dev happened to work
+// entirely on config.ts's built-in defaults, so the gap went unnoticed until
+// a real DevNet token needed to be injected without exporting it into shell
+// history.
+import "dotenv/config";
 import express, { type ErrorRequestHandler } from "express";
 // Must be imported before any router below: Express 4 doesn't route a
 // rejected promise from an async handler to error-handling middleware on
@@ -9,6 +17,7 @@ import express, { type ErrorRequestHandler } from "express";
 import "express-async-errors";
 import cors from "cors";
 import { config } from "./config.js";
+import { logger, requestLogger } from "./logging.js";
 import { healthRouter } from "./api/health.js";
 import { authRouter } from "./api/auth.js";
 import { orgsRouter } from "./api/orgs.js";
@@ -24,8 +33,11 @@ import { distributionsRouter } from "./api/distributions.js";
 import { reportsRouter } from "./api/reports.js";
 
 export const app = express();
-app.use(cors());
+// See config.ts's `allowedOrigin` doc comment: unset (dev default) reflects
+// any Origin; production deployments must set ALLOWED_ORIGIN.
+app.use(cors(config.allowedOrigin ? { origin: config.allowedOrigin } : undefined));
 app.use(express.json());
+app.use(requestLogger);
 app.use(healthRouter);
 app.use(authRouter);
 // investorSignupRouter is genuinely public (no requireAuth) and MUST be
@@ -51,14 +63,20 @@ app.use(reportsRouter);
 // Deliberately generic — this is a safety net, not a place to add
 // per-error business logic (that belongs in the route itself, as the
 // 400/403/404/409 responses throughout these routers already do).
-const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
-  console.error(err);
-  res.status(500).json({ error: "internal server error" });
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
+  logger.error("unhandled error", {
+    requestId: req.requestId,
+    method: req.method,
+    path: req.path,
+    message: err instanceof Error ? err.message : String(err),
+    stack: err instanceof Error ? err.stack : undefined,
+  });
+  res.status(500).json({ error: "internal server error", requestId: req.requestId });
 };
 app.use(errorHandler);
 
 if (process.env.NODE_ENV !== "test") {
   app.listen(config.port, () => {
-    console.log(`AmanaX backend listening on :${config.port} (ledger: ${config.ledgerApiUrl})`);
+    logger.info("backend listening", { port: config.port, ledgerApiUrl: config.ledgerApiUrl });
   });
 }

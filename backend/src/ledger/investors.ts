@@ -39,8 +39,11 @@ export async function createInvestorProfile(params: {
   distributor: string;
   fullName: string;
   email: string;
+  // See createOrganization's `party` doc comment — same escape hatch for a
+  // managed DevNet where this backend can't allocate new parties itself.
+  party?: string;
 }): Promise<InvestorProfile> {
-  const investor = await allocateParty(params.fullName.replace(/[^a-zA-Z0-9_-]/g, "-"));
+  const investor = params.party ?? (await allocateParty(params.fullName.replace(/[^a-zA-Z0-9_-]/g, "-")));
   const { contractId, createArgument } = await submitCreate({
     templateId: INVESTOR_PROFILE_TEMPLATE_ID,
     actAs: [params.operator],

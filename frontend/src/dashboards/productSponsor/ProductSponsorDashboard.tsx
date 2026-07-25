@@ -13,15 +13,17 @@ import { useOrganizations } from "../../hooks/useOrganizations";
 import { useProposals } from "../../hooks/useProposals";
 import { useStructures } from "../../hooks/useStructures";
 import { useInvestmentNotes } from "../../hooks/useInvestmentNotes";
+import { useComplianceReports } from "../../hooks/useComplianceReports";
 import { PRODUCT_TYPES, type ProductProposal, type ProductStructure, type ProductType } from "../../api/productsApi";
 import type { InvestmentNote } from "../../api/investmentNotesApi";
+import type { ComplianceReportItem } from "../../api/reportsApi";
 import { formatNGN } from "../../lib/format";
 import styles from "./ProductSponsorDashboard.module.css";
 
 const NAV_ITEMS = [
   { label: "Proposals", active: true, icon: <IconFileText /> },
   { label: "Notes", active: true, icon: <IconLayers /> },
-  { label: "Reports", disabled: true, icon: <IconShield /> },
+  { label: "Reports", active: true, icon: <IconShield /> },
 ];
 
 // Shared by both product-sponsoring roles (auth/types.ts ROLE_ROUTE
@@ -37,6 +39,7 @@ export default function ProductSponsorDashboard() {
   const proposals = useProposals(token);
   const structures = useStructures(token);
   const investmentNotes = useInvestmentNotes(token);
+  const complianceReports = useComplianceReports(token);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -47,7 +50,7 @@ export default function ProductSponsorDashboard() {
   const [targetSizeNGN, setTargetSizeNGN] = useState("");
   const [tenorMonths, setTenorMonths] = useState("");
 
-  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error ?? investmentNotes.error;
+  const error = actionError ?? orgs.error ?? proposals.error ?? structures.error ?? investmentNotes.error ?? complianceReports.error;
 
   const issuingHouses = orgs.data.filter((o) => o.role === "IssuingHouse" && o.active);
   const orgName = (party: string) => orgs.data.find((o) => o.party === party)?.name ?? party;
@@ -321,6 +324,45 @@ export default function ProductSponsorDashboard() {
             keyExtractor={(n) => n.contractId}
             emptyTitle="Nothing issued yet"
             emptyDescription="Once your product completes SEC approval and issuance, it will show up here."
+          />
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardHeader
+          title={
+            <span className={styles.cardTitle}>
+              <IconShield /> Compliance reports ({complianceReports.data.length})
+            </span>
+          }
+          description="Compliance snapshots the Issuing House has persisted for your deals."
+        />
+        <CardBody flush>
+          <DataTable
+            columns={[
+              {
+                key: "product",
+                header: "Product",
+                render: (r: ComplianceReportItem) => (
+                  <div className={styles.productCell}>
+                    <span className={styles.productName}>{r.productName}</span>
+                    <span className={styles.productMeta}>{new Date(r.generatedAt).toLocaleString()}</span>
+                  </div>
+                ),
+              },
+              {
+                key: "status",
+                header: "Status",
+                render: (r: ComplianceReportItem) => (
+                  <StatusBadge tone={r.readyForSubmission ? "success" : "warning"}>{r.readyForSubmission ? "Ready" : "Not ready"}</StatusBadge>
+                ),
+              },
+              { key: "gaps", header: "Open gaps", mono: true, render: (r: ComplianceReportItem) => r.workflowGaps.length + r.shariahChecklistGaps.length },
+            ]}
+            rows={complianceReports.data}
+            keyExtractor={(r) => r.contractId}
+            emptyTitle="No compliance reports yet"
+            emptyDescription="The Issuing House can persist one from an approved review of your deal."
           />
         </CardBody>
       </Card>

@@ -18,6 +18,10 @@ orgsRouter.use(requireAuth);
 const createOrgSchema = z.object({
   name: z.string().min(1),
   role: z.enum(ORG_ROLES),
+  // Optional: a party allocated out-of-band by the participant operator
+  // (see createOrganization's doc comment) — used as-is instead of
+  // allocating a new one when set.
+  party: z.string().min(1).optional(),
 });
 
 orgsRouter.post("/orgs", requireRole("PlatformOperator"), async (req, res) => {

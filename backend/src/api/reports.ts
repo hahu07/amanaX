@@ -2,12 +2,15 @@ import { Router } from "express";
 import { requireAuth, requireOrgParty, requireRole } from "../auth/middleware.js";
 import { getOperatorParty } from "../ledger/operator.js";
 import { listNotes } from "../ledger/issuance.js";
+import { readerParty } from "./issuance.js";
 import { listSubscriptions, type InstrumentId } from "../ledger/subscriptions.js";
-import { listProfitDistributions } from "../ledger/distributions.js";
-import { findApprovedTrusteeReviewById } from "../ledger/reviews.js";
+import { listProfitDistributions, listDistributionRequests } from "../ledger/distributions.js";
+import { findApprovedTrusteeReviewById, listShariahReviews } from "../ledger/reviews.js";
 import { findApprovalById } from "../ledger/regulatory.js";
 import { createComplianceReport, listComplianceReports } from "../ledger/complianceReports.js";
 import { listAuditLog, logAuditEvent } from "../ledger/auditLog.js";
+import { listInvestorProfiles } from "../ledger/investors.js";
+import { listOrganizations, listUsers } from "../ledger/organizations.js";
 import { invokeIssuingHouseAssistant, invokeReportingAgent, type ComplianceAssessment, type DealContext } from "../agents/client.js";
 
 export const reportsRouter = Router();
@@ -184,6 +187,107 @@ reportsRouter.get("/investment-notes/:contractId/reports/regulatory", requireRol
     agent: "reporting",
     summary: `Regulatory report generated for ${note.productName}`,
     dealId: note.contractId,
+  });
+  res.status(200).json(response);
+});
+
+// Distributor portfolio report — their own investor book (KYC status
+// breakdown) plus every subscription they've allocated. Naturally scoped:
+// both InvestorProfile and Subscription/Allocation name the distributor
+// as a stakeholder (Milestones 6-7), so no new privacy surface.
+reportsRouter.get("/reports/distributor", requireRole("Distributor"), async (req, res) => {
+  const distributor = requireOrgParty(req);
+  const investorProfiles = await listInvestorProfiles(distributor);
+  const holdings = (await listSubscriptions(distributor)).filter((s) => s.status === "Allocated");
+
+  const response = await invokeReportingAgent({
+    reportType: "portfolio",
+    dealId: distributor,
+    generatedFor: req.auth!.displayName,
+    investorProfiles: investorProfiles as unknown as Record<string, unknown>[],
+    holdings: holdings as unknown as Record<string, unknown>[],
+  });
+  await logAuditEvent({
+    actor: distributor,
+    kind: "ReportGenerated",
+    agent: "reporting",
+    summary: `Distributor portfolio report generated for ${req.auth!.displayName}`,
+    dealId: distributor,
+  });
+  res.status(200).json(response);
+});
+
+// Custodian report — every note they administer plus the distribution
+// requests/payouts they've processed. DistributionRequest/ProfitDistribution
+// name the custodian directly (Milestone 7), but InvestmentNote doesn't —
+// same reason api/issuance.ts's readerParty() reads notes via the
+// operator's party for this role, not the custodian's own.
+reportsRouter.get("/reports/custodian", requireRole("Custodian"), async (req, res) => {
+  const custodian = requireOrgParty(req);
+  const investmentNotes = await listNotes(await readerParty(req));
+  const distributionRequests = await listDistributionRequests(custodian);
+  const distributions = await listProfitDistributions(custodian);
+
+  const response = await invokeReportingAgent({
+    reportType: "custody",
+    dealId: custodian,
+    generatedFor: req.auth!.displayName,
+    investmentNotes: investmentNotes as unknown as Record<string, unknown>[],
+    distributionRequests: distributionRequests as unknown as Record<string, unknown>[],
+    distributions: distributions as unknown as Record<string, unknown>[],
+  });
+  await logAuditEvent({
+    actor: custodian,
+    kind: "ReportGenerated",
+    agent: "reporting",
+    summary: `Custodian report generated for ${req.auth!.displayName}`,
+    dealId: custodian,
+  });
+  res.status(200).json(response);
+});
+
+// Shariah Advisor report — their own certification history (certified +
+// pending), naturally scoped via ShariahReview's shariahAdvisor stakeholder.
+reportsRouter.get("/reports/shariah", requireRole("ShariahAdvisor"), async (req, res) => {
+  const shariahAdvisor = requireOrgParty(req);
+  const shariahReviews = await listShariahReviews(shariahAdvisor);
+
+  const response = await invokeReportingAgent({
+    reportType: "shariah",
+    dealId: shariahAdvisor,
+    generatedFor: req.auth!.displayName,
+    shariahReviews: shariahReviews as unknown as Record<string, unknown>[],
+  });
+  await logAuditEvent({
+    actor: shariahAdvisor,
+    kind: "ReportGenerated",
+    agent: "reporting",
+    summary: `Shariah Advisor report generated for ${req.auth!.displayName}`,
+    dealId: shariahAdvisor,
+  });
+  res.status(200).json(response);
+});
+
+// Platform report — network-wide org/user counts, the Operator's own
+// view (getOperatorParty() the same way every other operator-scoped read
+// in this codebase does).
+reportsRouter.get("/reports/platform", requireRole("PlatformOperator"), async (req, res) => {
+  const operator = await getOperatorParty();
+  const organizations = await listOrganizations(operator);
+  const users = await listUsers(operator);
+
+  const response = await invokeReportingAgent({
+    reportType: "platform",
+    dealId: operator,
+    organizations: organizations as unknown as Record<string, unknown>[],
+    users: users as unknown as Record<string, unknown>[],
+  });
+  await logAuditEvent({
+    actor: operator,
+    kind: "ReportGenerated",
+    agent: "reporting",
+    summary: "Platform report generated",
+    dealId: operator,
   });
   res.status(200).json(response);
 });

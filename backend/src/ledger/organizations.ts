@@ -65,8 +65,13 @@ export async function createOrganization(params: {
   operator: string;
   name: string;
   role: OrgRole;
+  // Set when the org's party was allocated out-of-band (see config.ts's
+  // OPERATOR_PARTY doc comment — the same managed-DevNet constraint applies
+  // here: this backend may have no rights to allocate new parties itself).
+  // Skips `allocateParty` and uses this party directly.
+  party?: string;
 }): Promise<Organization> {
-  const party = await allocateParty(params.name.replace(/[^a-zA-Z0-9_-]/g, "-"));
+  const party = params.party ?? (await allocateParty(params.name.replace(/[^a-zA-Z0-9_-]/g, "-")));
   const { contractId, createArgument } = await submitCreate({
     templateId: ORGANIZATION_TEMPLATE_ID,
     actAs: [params.operator],

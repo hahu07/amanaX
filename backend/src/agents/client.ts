@@ -1,5 +1,15 @@
 import { config } from "../config.js";
 
+// Sent on every call when configured — see config.ts's `agentsSharedSecret`
+// doc comment and agents/src/index.ts's requireInternalSecret.
+function internalHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (config.agentsSharedSecret) {
+    headers["X-Internal-Secret"] = config.agentsSharedSecret;
+  }
+  return headers;
+}
+
 // docs/implementation_plan.md §6.4 — the backend decides when to call the
 // assistant and owns building DealContext; the agents service never reads
 // the ledger itself. Recommendations aren't persisted yet (no backend/src/db
@@ -32,7 +42,7 @@ export async function invokeIssuingHouseAssistant(params: {
 }): Promise<InvokeResponse> {
   const res = await fetch(`${config.agentsServiceUrl}/internal/assistant/issuing-house/invoke`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: internalHeaders(),
     body: JSON.stringify(params),
   });
   if (!res.ok) {
@@ -63,7 +73,7 @@ export interface RiskInvokeResponse {
 export async function invokeRiskAgent(context: AllocationRiskContext): Promise<RiskInvokeResponse> {
   const res = await fetch(`${config.agentsServiceUrl}/internal/risk/assess`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: internalHeaders(),
     body: JSON.stringify(context),
   });
   if (!res.ok) {
@@ -84,7 +94,7 @@ export interface ComplianceAssessment {
 }
 
 export interface ReportContext {
-  reportType: "management" | "investor" | "compliance" | "regulatory";
+  reportType: "management" | "investor" | "compliance" | "regulatory" | "portfolio" | "custody" | "shariah" | "platform";
   dealId: string;
   generatedFor?: string;
   productName?: string;
@@ -98,6 +108,12 @@ export interface ReportContext {
   compliance?: ComplianceAssessment | null;
   holdings?: Record<string, unknown>[];
   distributions?: Record<string, unknown>[];
+  investorProfiles?: Record<string, unknown>[];
+  investmentNotes?: Record<string, unknown>[];
+  distributionRequests?: Record<string, unknown>[];
+  shariahReviews?: Record<string, unknown>[];
+  organizations?: Record<string, unknown>[];
+  users?: Record<string, unknown>[];
 }
 
 export interface ReportInvokeResponse {
@@ -110,7 +126,7 @@ export interface ReportInvokeResponse {
 export async function invokeReportingAgent(context: ReportContext): Promise<ReportInvokeResponse> {
   const res = await fetch(`${config.agentsServiceUrl}/internal/reports/generate`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: internalHeaders(),
     body: JSON.stringify(context),
   });
   if (!res.ok) {

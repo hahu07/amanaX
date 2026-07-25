@@ -1,6 +1,6 @@
 import { apiFetch } from "./backendClient";
 
-export type ReportType = "management" | "investor" | "compliance" | "regulatory";
+export type ReportType = "management" | "investor" | "compliance" | "regulatory" | "portfolio" | "custody" | "shariah" | "platform";
 
 export interface GeneratedReport {
   reportType: ReportType;
@@ -66,4 +66,20 @@ export async function listComplianceReports(token: string): Promise<ComplianceRe
 
 export async function listAuditLog(token: string): Promise<AuditLogEntry[]> {
   return apiFetch<AuditLogEntry[]>("/audit-log", token);
+}
+
+export async function getDistributorReport(token: string): Promise<ReportInvokeResponse> {
+  return apiFetch<ReportInvokeResponse>("/reports/distributor", token);
+}
+
+export async function getCustodianReport(token: string): Promise<ReportInvokeResponse> {
+  return apiFetch<ReportInvokeResponse>("/reports/custodian", token);
+}
+
+export async function getShariahReport(token: string): Promise<ReportInvokeResponse> {
+  return apiFetch<ReportInvokeResponse>("/reports/shariah", token);
+}
+
+export async function getPlatformReport(token: string): Promise<ReportInvokeResponse> {
+  return apiFetch<ReportInvokeResponse>("/reports/platform", token);
 }
