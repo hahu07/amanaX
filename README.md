@@ -49,6 +49,8 @@ cd frontend && npm install && npm run dev
 
 No `.env` is required for local dev — every variable has a dev-safe default. Log in with `operator@amanax.dev` (no password — this environment uses dev-login by email; production would swap in real OIDC) to onboard the other organizations from the Operator dashboard.
 
+**New here?** See [`WALKTHROUGH.md`](./WALKTHROUGH.md) for a step-by-step script through the full deal lifecycle — which demo account to use at each stage and exactly what to click.
+
 ## Deploying
 
 `render.yaml` deploys all three services (frontend, backend, agents) as a single Render Blueprint. Deploying against a real Canton Network DevNet/TestNet participant additionally needs a bearer token — see the `LEDGER_OIDC_*` variables, which drive an unattended refresh-token flow so the backend renews its own access token indefinitely rather than needing one pasted in by hand.
