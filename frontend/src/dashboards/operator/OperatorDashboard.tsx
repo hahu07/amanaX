@@ -7,6 +7,7 @@ import { StatusBadge, ActiveStatusBadge } from "../../components/StatusBadge";
 import { Button } from "../../components/Button";
 import { Alert } from "../../components/Alert";
 import { IconBuilding, IconFileText, IconPlus, IconShield, IconUsers } from "../../components/icons";
+import { ApiError } from "../../api/backendClient";
 import { useAuth } from "../../auth/AuthContext";
 import { ORG_ROLES, type OrgRole } from "../../auth/types";
 import { useOrganizations } from "../../hooks/useOrganizations";
@@ -71,8 +72,12 @@ export default function OperatorDashboard() {
       setOrgName("");
       setUserOrgParty(org.party);
       setShowOrgForm(false);
-    } catch {
-      setActionError("Could not create organization.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setActionError(JSON.parse(err.message).error);
+      } else {
+        setActionError("Could not create organization.");
+      }
     }
   }
 

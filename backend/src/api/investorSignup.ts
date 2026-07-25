@@ -2,6 +2,7 @@ import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { getOperatorParty } from "../ledger/operator.js";
+import { PartyAllocationDeniedError } from "../ledger/commands.js";
 import { listOrganizations } from "../ledger/organizations.js";
 import { createInvestorProfile } from "../ledger/investors.js";
 
@@ -45,6 +46,14 @@ investorSignupRouter.post("/investor-signup", signupRateLimit, async (req, res) 
     return;
   }
   const operator = await getOperatorParty();
-  const profile = await createInvestorProfile({ operator, ...parsed.data });
-  res.status(201).json(profile);
+  try {
+    const profile = await createInvestorProfile({ operator, ...parsed.data });
+    res.status(201).json(profile);
+  } catch (err) {
+    if (err instanceof PartyAllocationDeniedError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });

@@ -6,6 +6,28 @@ export function templateId(module: string, entity: string): string {
   return `#${config.packageName}:${module}:${entity}`;
 }
 
+// A managed participant (e.g. a shared hackathon DevNet) may grant this
+// backend's ledger-api user rights to act as a fixed set of pre-allocated
+// parties without granting it PartyManagementService rights to allocate new
+// ones itself — confirmed empirically against hackcanton-01 (POST /v2/parties
+// returns this exact shape: errorCategory -1, grpcCodeValue 7/PERMISSION_DENIED).
+// Distinguished from other ledger failures so routes can surface a clear,
+// actionable message instead of a bare 500 — see api/orgs.ts.
+export class PartyAllocationDeniedError extends Error {
+  constructor(hint: string) {
+    super(
+      `This backend's ledger account isn't allowed to allocate new parties on the configured participant (attempted hint: ${hint}). ` +
+        `Ask whoever administers the participant to allocate one and grant CanActAs rights to this backend's ledger-api user.`,
+    );
+    this.name = "PartyAllocationDeniedError";
+  }
+}
+
+function isPermissionDenied(error: unknown): boolean {
+  const e = error as { errorCategory?: number; grpcCodeValue?: number } | undefined;
+  return e?.errorCategory === -1 && e?.grpcCodeValue === 7;
+}
+
 // Sandbox has no ledger-API auth, so there's no JWT to derive a user from —
 // every command carries the same fixed `LEDGER_USER_ID`. A JWT-authenticated
 // participant (DevNet/TestNet/production) derives the ledger-api user from
@@ -29,6 +51,9 @@ export async function allocateParty(hint: string): Promise<string> {
     body: { partyIdHint: uniqueHint },
   });
   if (error || !data) {
+    if (isPermissionDenied(error)) {
+      throw new PartyAllocationDeniedError(hint);
+    }
     throw new Error(`allocateParty(${hint}) failed: ${JSON.stringify(error)}`);
   }
   return data.partyDetails.party;

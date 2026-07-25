@@ -2,6 +2,7 @@ import { Router } from "express";
 import { z } from "zod";
 import { requireAuth, requireRole } from "../auth/middleware.js";
 import { getOperatorParty } from "../ledger/operator.js";
+import { PartyAllocationDeniedError } from "../ledger/commands.js";
 import {
   ORG_ROLES,
   createOrganization,
@@ -31,8 +32,16 @@ orgsRouter.post("/orgs", requireRole("PlatformOperator"), async (req, res) => {
     return;
   }
   const operator = await getOperatorParty();
-  const org = await createOrganization({ operator, ...parsed.data });
-  res.status(201).json(org);
+  try {
+    const org = await createOrganization({ operator, ...parsed.data });
+    res.status(201).json(org);
+  } catch (err) {
+    if (err instanceof PartyAllocationDeniedError) {
+      res.status(403).json({ error: err.message });
+      return;
+    }
+    throw err;
+  }
 });
 
 // Read-only, any authenticated role: cross-org workflows (a Fund Manager

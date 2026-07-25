@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { listPublicDistributors, signupInvestor, type DistributorOption } from "../api/investorsApi";
+import { ApiError } from "../api/backendClient";
 import { Button } from "../components/Button";
 import { Alert } from "../components/Alert";
 import styles from "./LoginPage.module.css";
@@ -33,8 +34,12 @@ export default function InvestorSignupPage() {
     try {
       await signupInvestor({ fullName, email, distributor });
       setDone(true);
-    } catch {
-      setError("Could not create your investor account — check your details and try again.");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setError(JSON.parse(err.message).error);
+      } else {
+        setError("Could not create your investor account — check your details and try again.");
+      }
     } finally {
       setSubmitting(false);
     }
